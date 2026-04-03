@@ -4,7 +4,7 @@ from django.utils.safestring import mark_safe
 
 
 class SearchableLeafletWidget(forms.TextInput):
-    """Widget GIS dengan Leaflet + Multi-Basemap + Search + Locate + Legend"""
+    """Widget GIS dengan Leaflet + Custom Marker + Basemap Switcher + GPS Accuracy"""
     
     class Media:
         css = {
@@ -50,16 +50,6 @@ class SearchableLeafletWidget(forms.TextInput):
                 </div>
             </div>
             
-            <!-- Legend HTML Container (Hidden by default, handled by Leaflet Control) -->
-            <div id="{widget_id}_legend_html" style="display:none;">
-                <h4 style="margin: 0 0 5px; color: #333; font-size: 13px; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 3px;">
-                    🗺️ Legenda Peta
-                </h4>
-                <div><span style="display:inline-block; width:12px; height:12px; background:#e74c3c; border-radius:50%; margin-right:6px;"></span> Titik Fasilitas</div>
-                <div><span style="font-size:14px; margin-right:4px;">📍</span> Lokasi Anda (GPS)</div>
-                <div><span style="font-size:14px; margin-right:4px;">🟡</span> Mode Edit (Seret)</div>
-            </div>
-
             <div style="margin-top: 5px; color: #666; font-size: 12px;">
                 💡 Klik peta untuk set lokasi | 📍 GPS | ️ Edit | 🗑️ Hapus | 📚 Ganti Basemap
             </div>
@@ -87,44 +77,31 @@ class SearchableLeafletWidget(forms.TextInput):
             // Inisialisasi Peta
             var map = L.map(mapContainer).setView([-6.2088, 106.8456], 13);
 
-            // 🌍 DEFINISI BASEMAPS
+            // 🌍 DEFINISI BASEMAPS (OSM dihapus)
             var cartoLayer = L.tileLayer('https://{{s}}.basemaps.cartocdn.com/light_all/{{z}}/{{x}}/{{y}}{{r}}.png', {{
                 attribution: '&copy; OpenStreetMap &copy; CARTO', subdomains: 'abcd', maxZoom: 20
             }});
             var satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{{z}}/{{y}}/{{x}}', {{
                 attribution: 'Tiles &copy; Esri', maxZoom: 19
             }});
-            var osmLayer = L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
-                attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
-            }});
 
             cartoLayer.addTo(map);
             L.control.layers({{
                 "🗺️ CartoDB (Bersih)": cartoLayer,
-                "🛰️ Satellite (ESRI)": satelliteLayer,
-                "🛣️ OpenStreetMap": osmLayer
+                "🛰️ Satellite (ESRI)": satelliteLayer
             }}, null, {{ collapsed: true }}).addTo(map);
             
             // Scale Bar
             L.control.scale({{ position: 'bottomright', metric: true, imperial: true, maxWidth: 100 }}).addTo(map);
 
-            // 🏆 TAMBAHKAN LEGENDA (Pojok Kiri Bawah)
-            var legendContent = document.getElementById(widgetId + '_legend_html').innerHTML;
-            var legend = L.control({{position: 'bottomleft'}});
-            legend.onAdd = function (map) {{
-                var div = L.DomUtil.create('div', 'info legend');
-                div.innerHTML = legendContent;
-                div.style.background = 'white';
-                div.style.padding = '8px 10px';
-                div.style.borderRadius = '5px';
-                div.style.boxShadow = '0 0 15px rgba(0,0,0,0.2)';
-                div.style.color = '#444';
-                div.style.fontFamily = 'sans-serif';
-                div.style.fontSize = '12px';
-                div.style.lineHeight = '18px';
-                return div;
-            }};
-            legend.addTo(map);
+            // 📍 CUSTOM MARKER MENARIK (SVG Pin Modern)
+            var customIcon = L.divIcon({{
+                className: 'custom-map-pin',
+                html: '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="#e74c3c" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>',
+                iconSize: [32, 32],
+                iconAnchor: [16, 32],
+                popupAnchor: [0, -32]
+            }});
 
             // 🛠️ LOGIKA WIDGET
             var marker = null;
@@ -134,7 +111,8 @@ class SearchableLeafletWidget(forms.TextInput):
                 if (!lat || !lng) return;
                 hiddenInput.value = "POINT(" + lng + " " + lat + ")";
                 if (marker) map.removeLayer(marker);
-                marker = L.marker([lat, lng], {{draggable: false}}).addTo(map);
+                // ✅ Gunakan custom marker
+                marker = L.marker([lat, lng], {{icon: customIcon, draggable: false}}).addTo(map);
                 
                 marker.on('dragend', function(e) {{
                     var pos = e.target.getLatLng();
@@ -175,7 +153,7 @@ class SearchableLeafletWidget(forms.TextInput):
             searchContainer.addEventListener('click', e => e.stopPropagation());
             controlsDiv.addEventListener('click', e => e.stopPropagation());
 
-            // 📍 Locate Me
+            // 📍 Locate Me (✅ Akurasi Tetap Ditampilkan)
             if (locateBtn) {{
                 locateBtn.addEventListener('click', function(e) {{
                     e.stopPropagation();
@@ -184,9 +162,11 @@ class SearchableLeafletWidget(forms.TextInput):
                     navigator.geolocation.getCurrentPosition(
                         pos => {{ 
                             var lat = pos.coords.latitude, lng = pos.coords.longitude;
+                            var acc = Math.round(pos.coords.accuracy);
                             updateCoords(lat, lng, 'gps');
                             map.flyTo([lat, lng], 17, {{animate: true, duration: 1.5}});
-                            marker.bindPopup('📍 Lokasi Anda').openPopup();
+                            // ✅ Popup dengan akurasi
+                            marker.bindPopup('<b>📍 Lokasi Anda</b><br>Akurasi GPS: <b>' + acc + 'm</b>').openPopup();
                             locateBtn.innerHTML = '📍';
                         }},
                         err => {{ alert('Gagal: '+err.message); locateBtn.innerHTML = '📍'; }},

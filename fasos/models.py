@@ -1,10 +1,12 @@
+# fasos/models.py
 import uuid
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.contrib.gis.db import models as gis_models
 from django.conf import settings
 from django.utils import timezone
-from .managers import SoftDeleteManager
+from .managers import SoftDeleteManager, SoftDeleteUserManager
+
 
 # ==========================================
 # 1. MASTER OPD & CUSTOM USER
@@ -28,6 +30,7 @@ class OPD(models.Model):
     def hard_delete(self, *args, **kwargs): super().delete(*args, **kwargs)
     def restore(self): self.is_deleted = False; self.deleted_at = None; self.save(update_fields=['is_deleted', 'deleted_at'])
 
+
 class CustomUser(AbstractUser):
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True)
     ROLE_CHOICES = [('admin', 'Admin'), ('editor', 'Editor'), ('viewer', 'Viewer')]
@@ -35,7 +38,7 @@ class CustomUser(AbstractUser):
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='viewer')
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True, editable=False)
-    objects = SoftDeleteManager()
+    objects = SoftDeleteUserManager()  # ✅ WAJIB: SoftDeleteUserManager untuk kompatibilitas auth
 
     class Meta:
         verbose_name = "User Sistem"
@@ -48,13 +51,20 @@ class CustomUser(AbstractUser):
     def hard_delete(self, *args, **kwargs): super().delete(*args, **kwargs)
     def restore(self): self.is_deleted = False; self.deleted_at = None; self.save(update_fields=['is_deleted', 'deleted_at'])
 
+
 # ==========================================
 # 2. FASILITAS KESEHATAN (DINKES)
 # ==========================================
 class MedicalFacility(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True)
-    TYPE_CHOICES = [('Rumah Sakit','Rumah Sakit'), ('Puskesmas','Puskesmas'), ('Klinik', 'Klinik'), ('Apotik', 'Apotik')]
-    SPESIFIC_CHOICES = [('Rumah Sakit Umum','Rumah Sakit Umum'), ('Rumah Sakit Khusus','Rumah Sakit Khusus'), ('-', '-')]
+    
+    TYPE_CHOICES = [
+        ('Rumah Sakit', 'Rumah Sakit'), ('Puskesmas', 'Puskesmas'),
+        ('Klinik', 'Klinik'), ('Apotik', 'Apotik')
+    ]
+    SPESIFIC_CHOICES = [
+        ('Rumah Sakit Umum', 'Rumah Sakit Umum'), ('Rumah Sakit Khusus', 'Rumah Sakit Khusus'), ('-', '-')
+    ]
     STATUS_CHOICES = [
         ('Perencanaan/Pengajuan', 'Perencanaan/Pengajuan'), ('Dalam Masa Peninjauan', 'Dalam Masa Peninjauan'),
         ('Perencanaan Dibatalkan', 'Perencanaan Dibatalkan'), ('Dalam Masa Pembangunan', 'Dalam Masa Pembangunan'),
@@ -62,12 +72,18 @@ class MedicalFacility(models.Model):
         ('Pembangunan Selesai/Sudah Beroperasi', 'Pembangunan Selesai/Sudah Beroperasi'),
         ('Tutup/Sudah Tidak Beroperasi', 'Tutup/Sudah Tidak Beroperasi')
     ]
-    LEVEL_CHOICES = [('Kelas A', 'Kelas A'), ('Kelas B', 'Kelas B'), ('Kelas C', 'Kelas C'), ('Belum Mengisi Tingkatan', 'Belum Mengisi Tingkatan'), ('-', '-')]
-    DAYS_CHOICES = [('Setiap Hari', 'Setiap Hari'), ('Senin - Jumat', 'Senin - Jumat'), ('Sabtu - Minggu', 'Sabtu - Minggu')]
+    LEVEL_CHOICES = [
+        ('Kelas A', 'Kelas A'), ('Kelas B', 'Kelas B'), ('Kelas C', 'Kelas C'),
+        ('Belum Mengisi Tingkatan', 'Belum Mengisi Tingkatan'), ('-', '-')
+    ]
+    DAYS_CHOICES = [
+        ('Setiap Hari', 'Setiap Hari'), ('Senin - Jumat', 'Senin - Jumat'), ('Sabtu - Minggu', 'Sabtu - Minggu')
+    ]
     OWNERSHIP_STATUS_CHOICES = [
         ('Dikelola Pemerintah', 'Dikelola Pemerintah'), ('Dikelola Swasta', 'Dikelola Swasta'),
         ('Dikelola Organisasi Sosial', 'Dikelola Organisasi Sosial'), ('Belum Mengisi Penyelenggara', 'Belum Mengisi Penyelenggara'), ('-', '-')
     ]
+    
     koderumahsakit = models.CharField(max_length=10)
     nama = models.CharField(max_length=150)
     tipe = models.CharField(max_length=50, choices=TYPE_CHOICES, default='Rumah Sakit')
@@ -98,11 +114,13 @@ class MedicalFacility(models.Model):
     def hard_delete(self, *args, **kwargs): super().delete(*args, **kwargs)
     def restore(self): self.is_deleted = False; self.deleted_at = None; self.save(update_fields=['is_deleted', 'deleted_at'])
 
+
 # ==========================================
 # 3. KANTOR PEMERINTAH DAERAH (SETDA)
 # ==========================================
 class DistrictOfficeFacility(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True)
+    
     STATUS_CHOICES = [
         ('Perencanaan/Pengajuan', 'Perencanaan/Pengajuan'), ('Dalam Masa Peninjauan', 'Dalam Masa Peninjauan'),
         ('Perencanaan Dibatalkan', 'Perencanaan Dibatalkan'), ('Dalam Masa Pembangunan', 'Dalam Masa Pembangunan'),
@@ -110,8 +128,13 @@ class DistrictOfficeFacility(models.Model):
         ('Pembangunan Selesai/Sudah Beroperasi', 'Pembangunan Selesai/Sudah Beroperasi'),
         ('Tutup/Sudah Tidak Beroperasi', 'Tutup/Sudah Tidak Beroperasi')
     ]
-    DAYS_CHOICES = [('Setiap Hari', 'Setiap Hari'), ('Senin - Jumat', 'Senin - Jumat'), ('Sabtu - Minggu', 'Sabtu - Minggu')]
-    SPESIFIC_CHOICES = [('Perangkat Daerah', 'Perangkat Daerah'), ('Instansi Vertikal', 'Instansi Vertikal')]
+    DAYS_CHOICES = [
+        ('Setiap Hari', 'Setiap Hari'), ('Senin - Jumat', 'Senin - Jumat'), ('Sabtu - Minggu', 'Sabtu - Minggu')
+    ]
+    SPESIFIC_CHOICES = [
+        ('Perangkat Daerah', 'Perangkat Daerah'), ('Instansi Vertikal', 'Instansi Vertikal')
+    ]
+    
     nama = models.CharField(max_length=150)
     tipe = models.CharField(max_length=50, choices=SPESIFIC_CHOICES, default='Perangkat Daerah')
     alamat = models.TextField(max_length=255)
@@ -138,11 +161,13 @@ class DistrictOfficeFacility(models.Model):
     def hard_delete(self, *args, **kwargs): super().delete(*args, **kwargs)
     def restore(self): self.is_deleted = False; self.deleted_at = None; self.save(update_fields=['is_deleted', 'deleted_at'])
 
+
 # ==========================================
 # 4. CCTV MONITORING (DISKOMINFO)
 # ==========================================
 class CCTVFacility(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True)
+    
     STATUS_CHOICES = [
         ('Perencanaan/Pengajuan', 'Perencanaan/Pengajuan'), ('Dalam Masa Peninjauan', 'Dalam Masa Peninjauan'),
         ('Perencanaan Dibatalkan', 'Perencanaan Dibatalkan'), ('Dalam Masa Pembangunan', 'Dalam Masa Pembangunan'),
@@ -150,7 +175,9 @@ class CCTVFacility(models.Model):
         ('Pembangunan Selesai/Sudah Beroperasi', 'Pembangunan Selesai/Sudah Beroperasi'),
         ('Tutup/Sudah Tidak Beroperasi', 'Tutup/Sudah Tidak Beroperasi')
     ]
-    DAYS_CHOICES = [('Setiap Hari', 'Setiap Hari'), ('Senin - Jumat', 'Senin - Jumat'), ('Sabtu - Minggu', 'Sabtu - Minggu')]
+    DAYS_CHOICES = [
+        ('Setiap Hari', 'Setiap Hari'), ('Senin - Jumat', 'Senin - Jumat'), ('Sabtu - Minggu', 'Sabtu - Minggu')
+    ]
     SPESIFIC_CHOICES = [
         ('Perangkat Keamanan Pemerintah Daerah - CCTV', 'Perangkat Keamanan Pemerintah Daerah- CCTV'),
         ('Perangkat Keamanan Instansi Vertikal - CCTV', 'Perangkat Keamanan Instansi Vertikal- CCTV')
@@ -161,6 +188,7 @@ class CCTVFacility(models.Model):
         ('Polsek Panongan', 'Polsek Panongan'), ('Polsek Cikupa', 'Polsek Cikupa'), ('Polsek Cisoka', 'Polsek Cisoka'),
         ('Polresta Tangerang', 'Polresta Tangerang')
     ]
+    
     kode_cam = models.CharField(max_length=50)
     nama_lokasi = models.TextField(max_length=150)
     tipe = models.CharField(max_length=50, choices=SPESIFIC_CHOICES, default='Perangkat Keamanan Pemerintah Daerah - CCTV')
@@ -187,6 +215,7 @@ class CCTVFacility(models.Model):
         self.is_deleted = True; self.deleted_at = timezone.now(); self.save(update_fields=['is_deleted', 'deleted_at'])
     def hard_delete(self, *args, **kwargs): super().delete(*args, **kwargs)
     def restore(self): self.is_deleted = False; self.deleted_at = None; self.save(update_fields=['is_deleted', 'deleted_at'])
+
 
 # ==========================================
 # 5. BATAS KECAMATAN (SPATIAL POLYGON)

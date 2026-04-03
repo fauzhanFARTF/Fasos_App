@@ -1,4 +1,4 @@
-from rest_framework import viewsets
+from rest_framework import viewsets, filters
 from .models import MedicalFacility, DistrictOfficeFacility, CCTVFacility
 from .serializers import MedicalFacilitySerializer, DistrictOfficeFacilitySerializer, CCTVFacilitySerializer
 from .permissions import IsOPDModelAllowed
@@ -8,6 +8,9 @@ class MedicalFacilityViewSet(viewsets.ModelViewSet):
     queryset = MedicalFacility.objects.all()
     serializer_class = MedicalFacilitySerializer
     permission_classes = [IsAuthenticated, IsOPDModelAllowed]
+    lookup_field = 'uuid'  # ✅ Lookup by UUID instead of ID
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['nama', 'koderumahsakit', 'uuid']
 
     def get_queryset(self):
         user = self.request.user
@@ -18,6 +21,9 @@ class DistrictOfficeFacilityViewSet(viewsets.ModelViewSet):
     queryset = DistrictOfficeFacility.objects.all()
     serializer_class = DistrictOfficeFacilitySerializer
     permission_classes = [IsAuthenticated, IsOPDModelAllowed]
+    lookup_field = 'uuid'  # ✅
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['nama', 'uuid']
 
     def get_queryset(self):
         user = self.request.user
@@ -28,6 +34,9 @@ class CCTVFacilityViewSet(viewsets.ModelViewSet):
     queryset = CCTVFacility.objects.all()
     serializer_class = CCTVFacilitySerializer
     permission_classes = [IsAuthenticated, IsOPDModelAllowed]
+    lookup_field = 'uuid'  # ✅
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['kode_cam', 'nama_lokasi', 'uuid']
 
     def get_queryset(self):
         user = self.request.user

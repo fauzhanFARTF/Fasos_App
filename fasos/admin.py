@@ -197,14 +197,42 @@ class CCTVFacilityAdmin(OPDPermissionMixin, SoftDeleteAdminMixin, admin.ModelAdm
 
 
 # ==========================================
-# 6. ADMIN BATAS KECAMATAN
+# 6. ADMIN BATAS KECAMATAN (KHUSUS DTRB)
 # ==========================================
 @admin.register(BatasKecamatan)
-class BatasKecamatanAdmin(SoftDeleteAdminMixin, OPDPermissionMixin, admin.ModelAdmin):
+class BatasKecamatanAdmin(SoftDeleteAdminMixin, admin.ModelAdmin):
     list_display = ['uuid', 'kecamatan', 'kd_kcmtan', 'tipe', 'is_deleted']
     list_filter = ['is_deleted']
     search_fields = ['kecamatan', 'kd_kcmtan']
     readonly_fields = ['uuid', 'is_deleted', 'deleted_at']
     
     def has_module_permission(self, request):
-        return request.user.is_superuser or (request.user.is_authenticated and request.user.role in ['admin', 'editor'])
+        """🔒 Hanya tampil di sidebar untuk Superuser & OPD DTRB"""
+        if request.user.is_superuser:
+            return True
+        user = request.user
+        if not user.is_authenticated or not hasattr(user, 'opd') or not user.opd:
+            return False
+        return user.opd.kode == 'DTRB' or user.role == 'admin'
+
+    def get_queryset(self, request):
+        """📂 Hanya tampilkan data untuk Superuser & OPD DTRB"""
+        qs = super().get_queryset(request)  # Mengambil queryset dengan soft-delete support
+        if request.user.is_superuser:
+            return qs
+        if request.user.is_authenticated and hasattr(request.user, 'opd') and request.user.opd:
+            if request.user.opd.kode == 'DTRB':
+                return qs
+        return qs.none()
+
+    def has_add_permission(self, request):
+        if request.user.is_superuser: return True
+        return request.user.is_authenticated and request.user.opd and request.user.opd.kode == 'DTRB' and request.user.role in ['admin', 'editor']
+
+    def has_change_permission(self, request, obj=None):
+        if request.user.is_superuser: return True
+        return request.user.is_authenticated and request.user.opd and request.user.opd.kode == 'DTRB' and request.user.role in ['admin', 'editor']
+
+    def has_delete_permission(self, request, obj=None):
+        if request.user.is_superuser: return True
+        return request.user.is_authenticated and request.user.opd and request.user.opd.kode == 'DTRB' and request.user.role == 'admin'

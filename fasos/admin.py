@@ -45,7 +45,7 @@ class SoftDeleteAdminMixin:
     actions = [soft_delete_selected, restore_selected, hard_delete_selected]
 
     def get_queryset(self, request):
-        """Tampilkan semua data (aktif & terhapus)"""
+        """Tampilkan semua data (aktif & terhapus) di admin"""
         return self.model.objects.with_deleted()
 
 
@@ -145,7 +145,7 @@ class OPDUserAdmin(SoftDeleteAdminMixin, UserAdmin):
 
     def get_queryset(self, request):
         """Filter user hanya dari OPD yang sama (kecuali superuser)"""
-        qs = self.model.objects.with_deleted()
+        qs = CustomUser.objects.with_deleted()
 
         if request.user.is_superuser:
             return qs

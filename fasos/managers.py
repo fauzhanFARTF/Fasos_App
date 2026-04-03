@@ -2,9 +2,12 @@
 from django.db import models
 from django.utils import timezone
 
+
 class SoftDeleteQuerySet(models.QuerySet):
+    """Custom QuerySet untuk soft delete functionality"""
+
     def delete(self):
-        """Override delete() pada QuerySet untuk soft delete massal"""
+        """Override delete() untuk soft delete massal"""
         return self.update(is_deleted=True, deleted_at=timezone.now())
 
     def hard_delete(self):
@@ -13,11 +16,12 @@ class SoftDeleteQuerySet(models.QuerySet):
 
     def with_deleted(self):
         """Sertakan data yang sudah di-soft delete"""
-        return super().get_queryset()
+        # ✅ FIX: Jangan pakai super().get_queryset(), cukup return self._chain() atau filter
+        return self._chain() if hasattr(self, '_chain') else self.filter(is_deleted=True) | self.filter(is_deleted=False)
 
     def only_deleted(self):
         """Hanya tampilkan data yang sudah di-soft delete"""
-        return super().get_queryset().filter(is_deleted=True)
+        return self.filter(is_deleted=True)
 
     def restore(self):
         """Restore semua data di QuerySet"""
@@ -25,12 +29,16 @@ class SoftDeleteQuerySet(models.QuerySet):
 
 
 class SoftDeleteManager(models.Manager):
+    """Custom Manager untuk soft delete"""
+
     def get_queryset(self):
-        """Default: hanya tampilkan data aktif"""
+        """Default: hanya tampilkan data aktif (is_deleted=False)"""
         return SoftDeleteQuerySet(self.model, using=self._db).filter(is_deleted=False)
 
     def with_deleted(self):
-        return self.get_queryset().with_deleted()
+        """Sertakan data yang sudah di-soft delete"""
+        return SoftDeleteQuerySet(self.model, using=self._db)
 
     def only_deleted(self):
-        return self.get_queryset().only_deleted()
+        """Hanya tampilkan data yang sudah di-soft delete"""
+        return SoftDeleteQuerySet(self.model, using=self._db).filter(is_deleted=True)

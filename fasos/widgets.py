@@ -4,7 +4,7 @@ from django.utils.safestring import mark_safe
 
 
 class SearchableLeafletWidget(forms.TextInput):
-    """Widget GIS dengan Leaflet + Multi-Basemap + Search + Locate + Edit/Delete"""
+    """Widget GIS dengan Leaflet + Multi-Basemap + Search + Locate + Legend"""
     
     class Media:
         css = {
@@ -25,7 +25,7 @@ class SearchableLeafletWidget(forms.TextInput):
             <!-- ✅ Peta Lebar: min-width 750px -->
             <div id="{widget_id}_map" style="height: 450px; width: 100%; min-width: 750px; max-width: 100%; border: 1px solid #ccc; border-radius: 4px; position: relative;">
                 
-                <!-- Search Box (Tetap di Atas Kiri, agak geser dikit biar gak nabrak tombol vertikal) -->
+                <!-- Search Box (Atas Kiri) -->
                 <div id="{widget_id}_search_container" style="position: absolute; top: 10px; left: 60px; z-index: 1000; background: white; padding: 5px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">
                     <input type="text" id="{widget_id}_search" placeholder="Cari lokasi..." 
                            style="padding: 5px 10px; width: 250px; border: 1px solid #ddd; border-radius: 3px;">
@@ -49,8 +49,19 @@ class SearchableLeafletWidget(forms.TextInput):
                     </button>
                 </div>
             </div>
+            
+            <!-- Legend HTML Container (Hidden by default, handled by Leaflet Control) -->
+            <div id="{widget_id}_legend_html" style="display:none;">
+                <h4 style="margin: 0 0 5px; color: #333; font-size: 13px; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 3px;">
+                    🗺️ Legenda Peta
+                </h4>
+                <div><span style="display:inline-block; width:12px; height:12px; background:#e74c3c; border-radius:50%; margin-right:6px;"></span> Titik Fasilitas</div>
+                <div><span style="font-size:14px; margin-right:4px;">📍</span> Lokasi Anda (GPS)</div>
+                <div><span style="font-size:14px; margin-right:4px;">🟡</span> Mode Edit (Seret)</div>
+            </div>
+
             <div style="margin-top: 5px; color: #666; font-size: 12px;">
-                💡 Klik peta untuk set lokasi | 📍 GPS | ️ Edit (seret) | 🗑️ Hapus | Gunakan ikon 📚 di kanan atas untuk ganti basemap
+                💡 Klik peta untuk set lokasi | 📍 GPS | ️ Edit | 🗑️ Hapus | 📚 Ganti Basemap
             </div>
         </div>
         
@@ -94,7 +105,26 @@ class SearchableLeafletWidget(forms.TextInput):
                 "🛣️ OpenStreetMap": osmLayer
             }}, null, {{ collapsed: true }}).addTo(map);
             
+            // Scale Bar
             L.control.scale({{ position: 'bottomright', metric: true, imperial: true, maxWidth: 100 }}).addTo(map);
+
+            // 🏆 TAMBAHKAN LEGENDA (Pojok Kiri Bawah)
+            var legendContent = document.getElementById(widgetId + '_legend_html').innerHTML;
+            var legend = L.control({{position: 'bottomleft'}});
+            legend.onAdd = function (map) {{
+                var div = L.DomUtil.create('div', 'info legend');
+                div.innerHTML = legendContent;
+                div.style.background = 'white';
+                div.style.padding = '8px 10px';
+                div.style.borderRadius = '5px';
+                div.style.boxShadow = '0 0 15px rgba(0,0,0,0.2)';
+                div.style.color = '#444';
+                div.style.fontFamily = 'sans-serif';
+                div.style.fontSize = '12px';
+                div.style.lineHeight = '18px';
+                return div;
+            }};
+            legend.addTo(map);
 
             // 🛠️ LOGIKA WIDGET
             var marker = null;
@@ -109,7 +139,6 @@ class SearchableLeafletWidget(forms.TextInput):
                 marker.on('dragend', function(e) {{
                     var pos = e.target.getLatLng();
                     hiddenInput.value = "POINT(" + pos.lng + " " + pos.lat + ")";
-                    console.log('📝 Koordinat diperbarui (drag):', pos.lat.toFixed(5), pos.lng.toFixed(5));
                 }});
                 
                 if (source !== 'edit_off' && source !== 'delete') {{
@@ -157,7 +186,7 @@ class SearchableLeafletWidget(forms.TextInput):
                             var lat = pos.coords.latitude, lng = pos.coords.longitude;
                             updateCoords(lat, lng, 'gps');
                             map.flyTo([lat, lng], 17, {{animate: true, duration: 1.5}});
-                            marker.bindPopup('📍 Lokasi Anda<br>Akurasi: '+Math.round(pos.coords.accuracy)+'m').openPopup();
+                            marker.bindPopup('📍 Lokasi Anda').openPopup();
                             locateBtn.innerHTML = '📍';
                         }},
                         err => {{ alert('Gagal: '+err.message); locateBtn.innerHTML = '📍'; }},
@@ -175,11 +204,9 @@ class SearchableLeafletWidget(forms.TextInput):
                     if (isEditMode) {{
                         marker.dragging.enable();
                         editBtn.style.background = '#fff3cd';
-                        console.log('✏️ Edit mode: ON');
                     }} else {{
                         marker.dragging.disable();
                         editBtn.style.background = 'white';
-                        console.log('✏️ Edit mode: OFF');
                     }}
                 }});
             }}
@@ -195,7 +222,6 @@ class SearchableLeafletWidget(forms.TextInput):
                         hiddenInput.value = '';
                         isEditMode = false;
                         editBtn.style.background = 'white';
-                        console.log('🗑️ Titik dihapus');
                     }}
                 }});
             }}

@@ -153,11 +153,10 @@ class OPDUserAdmin(SoftDeleteAdminMixin, OPDPermissionMixin, admin.ModelAdmin): 
 
 
 # ==========================================
-# 3. ADMIN MEDICAL FACILITY (DINKES) - LEAFLET
+# 3. ADMIN MEDICAL FACILITY (DINKES) - DENGAN SEARCH
 # ==========================================
 @admin.register(MedicalFacility)
 class MedicalFacilityAdmin(OPDPermissionMixin, SoftDeleteAdminMixin, LeafletGeoAdminMixin, admin.ModelAdmin):
-    # Leaflet settings override
     settings_overrides = {
         'DEFAULT_CENTER': (-6.2088, 106.8456),
         'DEFAULT_ZOOM': 13,
@@ -167,10 +166,20 @@ class MedicalFacilityAdmin(OPDPermissionMixin, SoftDeleteAdminMixin, LeafletGeoA
     list_filter = ['is_deleted', 'status', 'tipe', 'operator__opd']
     search_fields = ['nama', 'koderumahsakit']
     readonly_fields = ['uuid', 'operator', 'is_deleted', 'deleted_at', 'date_field']
+    
+    # ✅ Tambah CSS & JS untuk search
+    class Media:
+        css = {
+            'all': ('https://unpkg.com/leaflet-search@2.9.8/dist/leaflet-search.min.css',)
+        }
+        js = (
+            'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+            'https://unpkg.com/leaflet-search@2.9.8/dist/leaflet-search.min.js',
+        )
 
 
 # ==========================================
-# 4. ADMIN DISTRICT OFFICE FACILITY (SETDA) - LEAFLET
+# 4. ADMIN DISTRICT OFFICE FACILITY (SETDA)
 # ==========================================
 @admin.register(DistrictOfficeFacility)
 class DistrictOfficeFacilityAdmin(OPDPermissionMixin, SoftDeleteAdminMixin, LeafletGeoAdminMixin, admin.ModelAdmin):
@@ -183,10 +192,19 @@ class DistrictOfficeFacilityAdmin(OPDPermissionMixin, SoftDeleteAdminMixin, Leaf
     list_filter = ['is_deleted', 'status', 'tipe', 'operator__opd']
     search_fields = ['nama']
     readonly_fields = ['uuid', 'operator', 'is_deleted', 'deleted_at', 'date_field']
+    
+    class Media:
+        css = {
+            'all': ('https://unpkg.com/leaflet-search@2.9.8/dist/leaflet-search.min.css',)
+        }
+        js = (
+            'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+            'https://unpkg.com/leaflet-search@2.9.8/dist/leaflet-search.min.js',
+        )
 
 
 # ==========================================
-# 5. ADMIN CCTV FACILITY (DISKOMINFO) - LEAFLET
+# 5. ADMIN CCTV FACILITY (DISKOMINFO)
 # ==========================================
 @admin.register(CCTVFacility)
 class CCTVFacilityAdmin(OPDPermissionMixin, SoftDeleteAdminMixin, LeafletGeoAdminMixin, admin.ModelAdmin):
@@ -199,6 +217,15 @@ class CCTVFacilityAdmin(OPDPermissionMixin, SoftDeleteAdminMixin, LeafletGeoAdmi
     list_filter = ['is_deleted', 'is_active', 'wilayah', 'operator__opd']
     search_fields = ['kode_cam', 'nama_lokasi']
     readonly_fields = ['uuid', 'operator', 'is_deleted', 'deleted_at', 'date_field']
+    
+    class Media:
+        css = {
+            'all': ('https://unpkg.com/leaflet-search@2.9.8/dist/leaflet-search.min.css',)
+        }
+        js = (
+            'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+            'https://unpkg.com/leaflet-search@2.9.8/dist/leaflet-search.min.js',
+        )
 
 
 # ==========================================

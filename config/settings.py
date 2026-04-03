@@ -176,20 +176,10 @@ LEAFLET_CONFIG = {
     'SCALE': 'both',
     'ATTRIBUTION_PREFIX': '© OpenStreetMap contributors',
     
-    # ✅ GANTI BAGIAN INI:
     'TILES': [
         [
-            'CartoDB Positron (Ringan)',
+            'CartoDB Positron',
             'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-            {
-                'attribution': '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
-                'subdomains': 'abcd',
-                'maxZoom': 20
-            }
-        ],
-        [
-            'CartoDB Voyager (Detail)',
-            'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
             {
                 'attribution': '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
                 'subdomains': 'abcd',
@@ -198,19 +188,14 @@ LEAFLET_CONFIG = {
         ]
     ],
     
+    # ✅ Konfigurasi Search yang BENAR
     'PLUGINS': {
-        'forms': {'auto-include': True},
-        'locatecontrol': {'auto-include': True},
-        'search': {
+        'forms': {
             'auto-include': True,
-            'settings': {
-                'url': 'https://nominatim.openstreetmap.org/search?format=json&q={s}',
-                'jsonpParam': 'json_callback',
-                'propertyLoc': 'display_name',
-                'autoCollapse': True,
-                'minLength': 2,
-                'autoSubmit': True,
-            }
-        }
+        },
+        'locatecontrol': {
+            'auto-include': True,
+        },
+        # Search plugin sudah include di django-leaflet forms
     }
 }

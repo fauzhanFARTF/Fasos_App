@@ -1,8 +1,9 @@
 # fasos/admin.py
-from django.contrib.gis import admin
-from leaflet.admin import LeafletGeoAdminMixin  # ✅ Import ini
+from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin
 from django.utils import timezone
 from .models import OPD, CustomUser, MedicalFacility, CCTVFacility, DistrictOfficeFacility, BatasKecamatan
+from .widgets import SearchableLeafletWidget  # ✅ Import widget custom
 
 
 # ==========================================
@@ -49,16 +50,12 @@ class OPDPermissionMixin:
     def has_module_permission(self, request):
         if request.user.is_superuser:
             return True
-        
         user = request.user
         if not user.is_authenticated or not hasattr(user, 'opd') or not user.opd:
             return False
-
         model_name = self.model.__name__
-
         if model_name in ['OPD', 'CustomUser']:
             return user.role == 'admin'
-
         allowed = self.ALLOWED_FACILITY_MODELS.get(user.opd.kode, [])
         return model_name in allowed
 
@@ -89,7 +86,7 @@ class OPDPermissionMixin:
 
 
 # ==========================================
-# 1. ADMIN OPD
+# 1. ADMIN OPD (HANYA SUPERUSER)
 # ==========================================
 @admin.register(OPD)
 class OPDAdmin(SoftDeleteAdminMixin, OPDPermissionMixin, admin.ModelAdmin):
@@ -107,17 +104,13 @@ class OPDAdmin(SoftDeleteAdminMixin, OPDPermissionMixin, admin.ModelAdmin):
 # 2. ADMIN CUSTOM USER
 # ==========================================
 @admin.register(CustomUser)
-class OPDUserAdmin(SoftDeleteAdminMixin, OPDPermissionMixin, admin.ModelAdmin):  # ✅ Tidak perlu Leaflet untuk User
+class CustomUserAdmin(SoftDeleteAdminMixin, OPDPermissionMixin, UserAdmin):
     model = CustomUser
     list_display = ['uuid', 'username', 'email', 'opd', 'role', 'is_staff', 'is_active', 'is_deleted']
     readonly_fields = ['uuid', 'last_login', 'date_joined', 'is_deleted', 'deleted_at']
 
-    fieldsets = (
-        (None, {'fields': ('username', 'password')}),
-        ('Personal Info', {'fields': ('first_name', 'last_name', 'email')}),
+    fieldsets = UserAdmin.fieldsets + (
         ('OPD & Role', {'fields': ('opd', 'role')}),
-        ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
-        ('Important Dates', {'fields': ('last_login', 'date_joined')}),
     )
     add_fieldsets = (
         (None, {
@@ -153,86 +146,61 @@ class OPDUserAdmin(SoftDeleteAdminMixin, OPDPermissionMixin, admin.ModelAdmin): 
 
 
 # ==========================================
-# 3. ADMIN MEDICAL FACILITY (DINKES) - DENGAN SEARCH
+# 3. ADMIN MEDICAL FACILITY (DINKES)
 # ==========================================
 @admin.register(MedicalFacility)
-class MedicalFacilityAdmin(OPDPermissionMixin, SoftDeleteAdminMixin, LeafletGeoAdminMixin, admin.ModelAdmin):
-    settings_overrides = {
-        'DEFAULT_CENTER': (-6.2088, 106.8456),
-        'DEFAULT_ZOOM': 13,
-    }
+class MedicalFacilityAdmin(OPDPermissionMixin, SoftDeleteAdminMixin, admin.ModelAdmin):
+    # ✅ Hapus LeafletGeoAdminMixin. Gunakan admin.ModelAdmin biasa + custom widget
     
     list_display = ['uuid', 'nama', 'tipe', 'status', 'operator', 'is_deleted', 'date_field']
     list_filter = ['is_deleted', 'status', 'tipe', 'operator__opd']
     search_fields = ['nama', 'koderumahsakit']
     readonly_fields = ['uuid', 'operator', 'is_deleted', 'deleted_at', 'date_field']
-    
-    # ✅ Tambah CSS & JS untuk search
-    class Media:
-        css = {
-            'all': ('https://unpkg.com/leaflet-search@2.9.8/dist/leaflet-search.min.css',)
-        }
-        js = (
-            'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
-            'https://unpkg.com/leaflet-search@2.9.8/dist/leaflet-search.min.js',
-        )
+
+    # ✅ Paksa Django menggunakan widget custom kita
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        if db_field.name == 'location':
+            kwargs['widget'] = SearchableLeafletWidget
+        return super().formfield_for_dbfield(db_field, request, **kwargs)
 
 
 # ==========================================
 # 4. ADMIN DISTRICT OFFICE FACILITY (SETDA)
 # ==========================================
 @admin.register(DistrictOfficeFacility)
-class DistrictOfficeFacilityAdmin(OPDPermissionMixin, SoftDeleteAdminMixin, LeafletGeoAdminMixin, admin.ModelAdmin):
-    settings_overrides = {
-        'DEFAULT_CENTER': (-6.2088, 106.8456),
-        'DEFAULT_ZOOM': 13,
-    }
-    
+class DistrictOfficeFacilityAdmin(OPDPermissionMixin, SoftDeleteAdminMixin, admin.ModelAdmin):
     list_display = ['uuid', 'nama', 'tipe', 'status', 'operator', 'is_deleted', 'date_field']
     list_filter = ['is_deleted', 'status', 'tipe', 'operator__opd']
     search_fields = ['nama']
     readonly_fields = ['uuid', 'operator', 'is_deleted', 'deleted_at', 'date_field']
-    
-    class Media:
-        css = {
-            'all': ('https://unpkg.com/leaflet-search@2.9.8/dist/leaflet-search.min.css',)
-        }
-        js = (
-            'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
-            'https://unpkg.com/leaflet-search@2.9.8/dist/leaflet-search.min.js',
-        )
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        if db_field.name == 'location':
+            kwargs['widget'] = SearchableLeafletWidget
+        return super().formfield_for_dbfield(db_field, request, **kwargs)
 
 
 # ==========================================
 # 5. ADMIN CCTV FACILITY (DISKOMINFO)
 # ==========================================
 @admin.register(CCTVFacility)
-class CCTVFacilityAdmin(OPDPermissionMixin, SoftDeleteAdminMixin, LeafletGeoAdminMixin, admin.ModelAdmin):
-    settings_overrides = {
-        'DEFAULT_CENTER': (-6.2088, 106.8456),
-        'DEFAULT_ZOOM': 13,
-    }
-    
+class CCTVFacilityAdmin(OPDPermissionMixin, SoftDeleteAdminMixin, admin.ModelAdmin):
     list_display = ['uuid', 'kode_cam', 'nama_lokasi', 'wilayah', 'is_active', 'operator', 'is_deleted', 'date_field']
     list_filter = ['is_deleted', 'is_active', 'wilayah', 'operator__opd']
     search_fields = ['kode_cam', 'nama_lokasi']
     readonly_fields = ['uuid', 'operator', 'is_deleted', 'deleted_at', 'date_field']
-    
-    class Media:
-        css = {
-            'all': ('https://unpkg.com/leaflet-search@2.9.8/dist/leaflet-search.min.css',)
-        }
-        js = (
-            'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
-            'https://unpkg.com/leaflet-search@2.9.8/dist/leaflet-search.min.js',
-        )
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        if db_field.name == 'location':
+            kwargs['widget'] = SearchableLeafletWidget
+        return super().formfield_for_dbfield(db_field, request, **kwargs)
 
 
 # ==========================================
 # 6. ADMIN BATAS KECAMATAN
 # ==========================================
 @admin.register(BatasKecamatan)
-class BatasKecamatanAdmin(SoftDeleteAdminMixin, OPDPermissionMixin, admin.ModelAdmin):  # ✅ Tidak perlu Leaflet untuk Polygon
+class BatasKecamatanAdmin(SoftDeleteAdminMixin, OPDPermissionMixin, admin.ModelAdmin):
     list_display = ['uuid', 'kecamatan', 'kd_kcmtan', 'tipe', 'is_deleted']
     list_filter = ['is_deleted']
     search_fields = ['kecamatan', 'kd_kcmtan']

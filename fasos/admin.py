@@ -1,6 +1,6 @@
 # fasos/admin.py
 from django.contrib.gis import admin
-from django.contrib.auth.admin import UserAdmin
+from leaflet.admin import LeafletGeoAdminMixin  # ✅ Import ini
 from django.utils import timezone
 from .models import OPD, CustomUser, MedicalFacility, CCTVFacility, DistrictOfficeFacility, BatasKecamatan
 
@@ -40,9 +40,6 @@ class SoftDeleteAdminMixin:
 # MIXIN: OPD PERMISSION & MENU VISIBILITY
 # ==========================================
 class OPDPermissionMixin:
-    """Mixin untuk filter data, permission CRUD, dan menyembunyikan menu di sidebar"""
-    
-    # 🗺️ Mapping OPD ke Model Fasilitas yang diizinkan
     ALLOWED_FACILITY_MODELS = {
         'DINKES': ['MedicalFacility'],
         'DISKOMINFO': ['CCTVFacility'],
@@ -50,7 +47,6 @@ class OPDPermissionMixin:
     }
 
     def has_module_permission(self, request):
-        """🔒 Kontrol tampilan menu di sidebar Django Admin"""
         if request.user.is_superuser:
             return True
         
@@ -60,16 +56,13 @@ class OPDPermissionMixin:
 
         model_name = self.model.__name__
 
-        # OPD & User Management: Hanya visible untuk role 'admin'
         if model_name in ['OPD', 'CustomUser']:
             return user.role == 'admin'
 
-        # Fasilitas: Hanya visible jika cocok dengan OPD user
         allowed = self.ALLOWED_FACILITY_MODELS.get(user.opd.kode, [])
         return model_name in allowed
 
     def get_queryset(self, request):
-        """Filter data hanya milik OPD user yang login"""
         qs = super().get_queryset(request)
         if request.user.is_superuser:
             return qs
@@ -96,7 +89,7 @@ class OPDPermissionMixin:
 
 
 # ==========================================
-# 1. ADMIN OPD (HANYA SUPERUSER & ADMIN ROLE)
+# 1. ADMIN OPD
 # ==========================================
 @admin.register(OPD)
 class OPDAdmin(SoftDeleteAdminMixin, OPDPermissionMixin, admin.ModelAdmin):
@@ -114,13 +107,24 @@ class OPDAdmin(SoftDeleteAdminMixin, OPDPermissionMixin, admin.ModelAdmin):
 # 2. ADMIN CUSTOM USER
 # ==========================================
 @admin.register(CustomUser)
-class OPDUserAdmin(SoftDeleteAdminMixin, OPDPermissionMixin, UserAdmin):
+class OPDUserAdmin(SoftDeleteAdminMixin, OPDPermissionMixin, admin.ModelAdmin):  # ✅ Tidak perlu Leaflet untuk User
     model = CustomUser
     list_display = ['uuid', 'username', 'email', 'opd', 'role', 'is_staff', 'is_active', 'is_deleted']
     readonly_fields = ['uuid', 'last_login', 'date_joined', 'is_deleted', 'deleted_at']
 
-    fieldsets = UserAdmin.fieldsets + (('OPD & Role', {'fields': ('opd', 'role')}),)
-    add_fieldsets = ((None, {'classes': ('wide',), 'fields': ('username', 'email', 'password1', 'password2', 'opd', 'role')}),)
+    fieldsets = (
+        (None, {'fields': ('username', 'password')}),
+        ('Personal Info', {'fields': ('first_name', 'last_name', 'email')}),
+        ('OPD & Role', {'fields': ('opd', 'role')}),
+        ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
+        ('Important Dates', {'fields': ('last_login', 'date_joined')}),
+    )
+    add_fieldsets = (
+        (None, {
+            'classes': ('wide',),
+            'fields': ('username', 'email', 'password1', 'password2', 'opd', 'role'),
+        }),
+    )
 
     def get_queryset(self, request):
         qs = CustomUser.objects.with_deleted()
@@ -149,11 +153,16 @@ class OPDUserAdmin(SoftDeleteAdminMixin, OPDPermissionMixin, UserAdmin):
 
 
 # ==========================================
-# 3. ADMIN MEDICAL FACILITY (DINKES)
+# 3. ADMIN MEDICAL FACILITY (DINKES) - LEAFLET
 # ==========================================
 @admin.register(MedicalFacility)
-class MedicalFacilityAdmin(OPDPermissionMixin, SoftDeleteAdminMixin, admin.GISModelAdmin):
-    gis_widget_kwargs = {"attrs": {"default_lon": 106.8, "default_lat": -6.2, "default_zoom": 10}}
+class MedicalFacilityAdmin(OPDPermissionMixin, SoftDeleteAdminMixin, LeafletGeoAdminMixin, admin.ModelAdmin):
+    # Leaflet settings override
+    settings_overrides = {
+        'DEFAULT_CENTER': (-6.2088, 106.8456),
+        'DEFAULT_ZOOM': 13,
+    }
+    
     list_display = ['uuid', 'nama', 'tipe', 'status', 'operator', 'is_deleted', 'date_field']
     list_filter = ['is_deleted', 'status', 'tipe', 'operator__opd']
     search_fields = ['nama', 'koderumahsakit']
@@ -161,11 +170,15 @@ class MedicalFacilityAdmin(OPDPermissionMixin, SoftDeleteAdminMixin, admin.GISMo
 
 
 # ==========================================
-# 4. ADMIN DISTRICT OFFICE FACILITY (SETDA)
+# 4. ADMIN DISTRICT OFFICE FACILITY (SETDA) - LEAFLET
 # ==========================================
 @admin.register(DistrictOfficeFacility)
-class DistrictOfficeFacilityAdmin(OPDPermissionMixin, SoftDeleteAdminMixin, admin.GISModelAdmin):
-    gis_widget_kwargs = {"attrs": {"default_lon": 106.8, "default_lat": -6.2, "default_zoom": 10}}
+class DistrictOfficeFacilityAdmin(OPDPermissionMixin, SoftDeleteAdminMixin, LeafletGeoAdminMixin, admin.ModelAdmin):
+    settings_overrides = {
+        'DEFAULT_CENTER': (-6.2088, 106.8456),
+        'DEFAULT_ZOOM': 13,
+    }
+    
     list_display = ['uuid', 'nama', 'tipe', 'status', 'operator', 'is_deleted', 'date_field']
     list_filter = ['is_deleted', 'status', 'tipe', 'operator__opd']
     search_fields = ['nama']
@@ -173,11 +186,15 @@ class DistrictOfficeFacilityAdmin(OPDPermissionMixin, SoftDeleteAdminMixin, admi
 
 
 # ==========================================
-# 5. ADMIN CCTV FACILITY (DISKOMINFO)
+# 5. ADMIN CCTV FACILITY (DISKOMINFO) - LEAFLET
 # ==========================================
 @admin.register(CCTVFacility)
-class CCTVFacilityAdmin(OPDPermissionMixin, SoftDeleteAdminMixin, admin.GISModelAdmin):
-    gis_widget_kwargs = {"attrs": {"default_lon": 106.8, "default_lat": -6.2, "default_zoom": 10}}
+class CCTVFacilityAdmin(OPDPermissionMixin, SoftDeleteAdminMixin, LeafletGeoAdminMixin, admin.ModelAdmin):
+    settings_overrides = {
+        'DEFAULT_CENTER': (-6.2088, 106.8456),
+        'DEFAULT_ZOOM': 13,
+    }
+    
     list_display = ['uuid', 'kode_cam', 'nama_lokasi', 'wilayah', 'is_active', 'operator', 'is_deleted', 'date_field']
     list_filter = ['is_deleted', 'is_active', 'wilayah', 'operator__opd']
     search_fields = ['kode_cam', 'nama_lokasi']
@@ -185,15 +202,14 @@ class CCTVFacilityAdmin(OPDPermissionMixin, SoftDeleteAdminMixin, admin.GISModel
 
 
 # ==========================================
-# 6. ADMIN BATAS KECAMATAN (SPATIAL)
+# 6. ADMIN BATAS KECAMATAN
 # ==========================================
 @admin.register(BatasKecamatan)
-class BatasKecamatanAdmin(SoftDeleteAdminMixin, OPDPermissionMixin, admin.GISModelAdmin):
+class BatasKecamatanAdmin(SoftDeleteAdminMixin, OPDPermissionMixin, admin.ModelAdmin):  # ✅ Tidak perlu Leaflet untuk Polygon
     list_display = ['uuid', 'kecamatan', 'kd_kcmtan', 'tipe', 'is_deleted']
     list_filter = ['is_deleted']
     search_fields = ['kecamatan', 'kd_kcmtan']
     readonly_fields = ['uuid', 'is_deleted', 'deleted_at']
     
-    # Batas Kecamatan bisa dilihat semua staff, atau batasi ke superuser saja
     def has_module_permission(self, request):
         return request.user.is_superuser or (request.user.is_authenticated and request.user.role in ['admin', 'editor'])

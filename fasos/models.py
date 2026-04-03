@@ -5,12 +5,13 @@ from django.contrib.gis.db import models as gis_models
 from django.conf import settings
 
 # ==========================================
-# 1. MASTER OPD & CUSTOM USER
+# 1. MASTER OPD & CUSTOM USER (DENGAN UUID)
 # ==========================================
 class OPD(models.Model):
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True, help_text="Auto-generated unique identifier")
     nama = models.CharField(max_length=100)
     kode = models.CharField(max_length=20, unique=True)
-
+    
     class Meta:
         verbose_name = "Organisasi Perangkat Daerah"
         verbose_name_plural = "Master OPD"
@@ -20,10 +21,11 @@ class OPD(models.Model):
         return f"{self.kode} - {self.nama}"
 
 class CustomUser(AbstractUser):
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True, help_text="Auto-generated unique identifier")
     ROLE_CHOICES = [('admin', 'Admin'), ('editor', 'Editor'), ('viewer', 'Viewer')]
     opd = models.ForeignKey(OPD, on_delete=models.PROTECT, null=True, blank=True, related_name='users')
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='viewer')
-
+    
     class Meta:
         verbose_name = "User Sistem"
         verbose_name_plural = "Manajemen User"
@@ -37,7 +39,6 @@ class CustomUser(AbstractUser):
 # ==========================================
 class MedicalFacility(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True, help_text="Auto-generated unique identifier")
-
     TYPE_CHOICES = [('Rumah Sakit','Rumah Sakit'), ('Puskesmas','Puskesmas'), ('Klinik', 'Klinik'), ('Apotik', 'Apotik')]
     SPESIFIC_CHOICES = [('Rumah Sakit Umum','Rumah Sakit Umum'), ('Rumah Sakit Khusus','Rumah Sakit Khusus'), ('-', '-')]
     STATUS_CHOICES = [
@@ -53,7 +54,7 @@ class MedicalFacility(models.Model):
         ('Dikelola Pemerintah', 'Dikelola Pemerintah'), ('Dikelola Swasta', 'Dikelola Swasta'),
         ('Dikelola Organisasi Sosial', 'Dikelola Organisasi Sosial'), ('Belum Mengisi Penyelenggara', 'Belum Mengisi Penyelenggara'), ('-', '-')
     ]
-
+    
     koderumahsakit = models.CharField(max_length=10)
     nama = models.CharField(max_length=150)
     tipe = models.CharField(max_length=50, choices=TYPE_CHOICES, default='Rumah Sakit')
@@ -83,7 +84,6 @@ class MedicalFacility(models.Model):
 # ==========================================
 class DistrictOfficeFacility(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True, help_text="Auto-generated unique identifier")
-
     STATUS_CHOICES = [
         ('Perencanaan/Pengajuan', 'Perencanaan/Pengajuan'), ('Dalam Masa Peninjauan', 'Dalam Masa Peninjauan'),
         ('Perencanaan Dibatalkan', 'Perencanaan Dibatalkan'), ('Dalam Masa Pembangunan', 'Dalam Masa Pembangunan'),
@@ -93,7 +93,7 @@ class DistrictOfficeFacility(models.Model):
     ]
     DAYS_CHOICES = [('Setiap Hari', 'Setiap Hari'), ('Senin - Jumat', 'Senin - Jumat'), ('Sabtu - Minggu', 'Sabtu - Minggu')]
     SPESIFIC_CHOICES = [('Perangkat Daerah', 'Perangkat Daerah'), ('Instansi Vertikal', 'Instansi Vertikal')]
-
+    
     nama = models.CharField(max_length=150)
     tipe = models.CharField(max_length=50, choices=SPESIFIC_CHOICES, default='Perangkat Daerah')
     alamat = models.TextField(max_length=255)
@@ -119,7 +119,6 @@ class DistrictOfficeFacility(models.Model):
 # ==========================================
 class CCTVFacility(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True, help_text="Auto-generated unique identifier")
-
     STATUS_CHOICES = [
         ('Perencanaan/Pengajuan', 'Perencanaan/Pengajuan'), ('Dalam Masa Peninjauan', 'Dalam Masa Peninjauan'),
         ('Perencanaan Dibatalkan', 'Perencanaan Dibatalkan'), ('Dalam Masa Pembangunan', 'Dalam Masa Pembangunan'),
@@ -138,7 +137,7 @@ class CCTVFacility(models.Model):
         ('Polsek Panongan', 'Polsek Panongan'), ('Polsek Cikupa', 'Polsek Cikupa'), ('Polsek Cisoka', 'Polsek Cisoka'),
         ('Polresta Tangerang', 'Polresta Tangerang')
     ]
-
+    
     kode_cam = models.CharField(max_length=50)
     nama_lokasi = models.TextField(max_length=150)
     tipe = models.CharField(max_length=50, choices=SPESIFIC_CHOICES, default='Perangkat Keamanan Pemerintah Daerah - CCTV')
@@ -165,7 +164,6 @@ class CCTVFacility(models.Model):
 # ==========================================
 class BatasKecamatan(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True, help_text="Auto-generated unique identifier")
-
     kecamatan = models.CharField(max_length=150)
     kd_kcmtan = models.CharField(max_length=20)
     tipe = models.CharField(max_length=20)
@@ -174,5 +172,5 @@ class BatasKecamatan(models.Model):
     class Meta:
         verbose_name = "Batas Kecamatan"
         verbose_name_plural = "Data Spasial Kecamatan"
-
+    
     def __str__(self): return f"{self.kecamatan} ({self.kd_kcmtan})"

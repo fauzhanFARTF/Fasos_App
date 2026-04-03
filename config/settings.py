@@ -156,3 +156,10 @@ REST_FRAMEWORK = {
 # CORS Settings
 CORS_ALLOWED_ORIGINS = env.list('CORS_ORIGINS', default=['http://localhost:5173'])
 CORS_ALLOW_CREDENTIALS = True
+
+# Static & Media Files
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'assets' / 'static'
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'assets' / 'media'

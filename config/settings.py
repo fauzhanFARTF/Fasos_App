@@ -166,33 +166,41 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'assets' / 'media'
 
 
-# Leaflet Configuration
+# config/settings.py
+
 LEAFLET_CONFIG = {
-    'DEFAULT_CENTER': (-6.2088, 106.8456),  # Jakarta/Tangerang
+    'DEFAULT_CENTER': (-6.2088, 106.8456),
     'DEFAULT_ZOOM': 13,
     'MIN_ZOOM': 3,
     'MAX_ZOOM': 20,
     'SCALE': 'both',
     'ATTRIBUTION_PREFIX': '© OpenStreetMap contributors',
+    
+    # ✅ GANTI BAGIAN INI:
     'TILES': [
         [
-            'OpenStreetMap',
-            'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-            {'attribution': '© OpenStreetMap'}
+            'CartoDB Positron (Ringan)',
+            'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+            {
+                'attribution': '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+                'subdomains': 'abcd',
+                'maxZoom': 20
+            }
         ],
         [
-            'Satellite',
-            'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-            {'attribution': '© ESRI'}
+            'CartoDB Voyager (Detail)',
+            'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+            {
+                'attribution': '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+                'subdomains': 'abcd',
+                'maxZoom': 20
+            }
         ]
     ],
+    
     'PLUGINS': {
-        'forms': {
-            'auto-include': True,
-        },
-        'locatecontrol': {
-            'auto-include': True,
-        },
+        'forms': {'auto-include': True},
+        'locatecontrol': {'auto-include': True},
         'search': {
             'auto-include': True,
             'settings': {

@@ -1,65 +1,44 @@
-# from django.contrib import admin
 from django.contrib.gis import admin
-from .models import MedicalFacility, DistrictOfficeFacility, CCTVFacility, BatasKecamatan, OPD, CustomUser
+from django.contrib.auth.admin import UserAdmin
+from .models import OPD, CustomUser, MedicalFacility, CCTVFacility, DistrictOfficeFacility, BatasKecamatan
 
-# ==========================================
-# 1. ADMIN OPD
-# ==========================================
 @admin.register(OPD)
 class OPDAdmin(admin.ModelAdmin):
-    list_display = ['kode', 'nama']
+    list_display = ['uuid', 'kode', 'nama']
+    readonly_fields = ['uuid']
     search_fields = ['nama', 'kode']
     ordering = ['kode']
 
-# ==========================================
-# 2. ADMIN CUSTOM USER
-# ==========================================
 @admin.register(CustomUser)
-class CustomUserAdmin(admin.ModelAdmin):
-    list_display = ['username', 'email', 'opd', 'role', 'is_staff']
-    list_filter = ['opd', 'role', 'is_staff']
-    search_fields = ['username', 'email']
-    fieldsets = (
-        (None, {'fields': ('username', 'password')}),
-        ('Personal Info', {'fields': ('first_name', 'last_name', 'email')}),
-        ('OPD & Role', {'fields': ('opd', 'role')}),
-        ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
-        ('Important Dates', {'fields': ('last_login', 'date_joined')}),
+class CustomUserAdmin(UserAdmin):
+    model = CustomUser
+    list_display = ['uuid', 'username', 'email', 'opd', 'role', 'is_staff']
+    readonly_fields = ['uuid']
+    fieldsets = UserAdmin.fieldsets + (('OPD & Role', {'fields': ('opd', 'role')}),)
+    add_fieldsets = (
+        (None, {
+            'classes': ('wide',),
+            'fields': ('username', 'email', 'password1', 'password2', 'opd', 'role'),
+        }),
     )
-    add_fieldsets = ((None, {'classes': ('wide',), 'fields': ('username', 'email', 'opd', 'role', 'password1', 'password2')}),)
 
-# ==========================================
-# 3. ADMIN MEDICAL FACILITY (GIS)
-# ==========================================
 @admin.register(MedicalFacility)
 class MedicalFacilityAdmin(admin.GISModelAdmin):
     gis_widget_kwargs = {"attrs": {"default_lon": 106.8, "default_lat": -6.2, "default_zoom": 10}}
     list_display = ['uuid', 'nama', 'tipe', 'status', 'operator']
     readonly_fields = ['uuid']
 
-# ==========================================
-# 4. ADMIN DISTRICT OFFICE FACILITY (GIS)
-# ==========================================
-
 @admin.register(DistrictOfficeFacility)
 class DistrictOfficeFacilityAdmin(admin.GISModelAdmin):
     gis_widget_kwargs = {"attrs": {"default_lon": 106.8, "default_lat": -6.2, "default_zoom": 10}}
     list_display = ['uuid', 'nama', 'tipe', 'status', 'operator']
     readonly_fields = ['uuid']
-    
-# ==========================================
-# 5. ADMINCCTV FACILITY (GIS)
-# ==========================================
 
 @admin.register(CCTVFacility)
 class CCTVFacilityAdmin(admin.GISModelAdmin):
     gis_widget_kwargs = {"attrs": {"default_lon": 106.8, "default_lat": -6.2, "default_zoom": 10}}
     list_display = ['uuid', 'kode_cam', 'nama_lokasi', 'wilayah', 'is_active', 'operator']
     readonly_fields = ['uuid']
-
-# ==========================================
-# 6. ADMIN BATAS KECAMATAN (GIS)
-# ==========================================
 
 @admin.register(BatasKecamatan)
 class BatasKecamatanAdmin(admin.GISModelAdmin):

@@ -4,72 +4,34 @@ from django.contrib.auth.admin import UserAdmin
 from .models import OPD, CustomUser, MedicalFacility, CCTVFacility, DistrictOfficeFacility, BatasKecamatan
 
 # ==========================================
-# MIXIN: PERMISSION BASED ON ROLE & OPD
+# 1. ADMIN OPD (KUNCI: HANYA SUPERUSER)
 # ==========================================
-class OPDPermissionMixin:
-    """
-    Mixin untuk membatasi akses berdasarkan role dan memfilter data per OPD.
-    - Admin: Full access (add/change/delete) untuk OPD-nya
-    - Editor: Add/Change only untuk OPD-nya
-    - Viewer: Read-only untuk OPD-nya
-    """
-    
-    def get_queryset(self, request):
-        """Filter data hanya milik OPD user yang login"""
-        qs = super().get_queryset(request)
-        
-        # Superuser lihat semua
-        if request.user.is_superuser:
-            return qs
-        
-        # User biasa hanya lihat data OPD-nya
-        if request.user.is_authenticated and hasattr(request.user, 'opd') and request.user.opd:
-            return qs.filter(operator__opd=request.user.opd)
-        
-        return qs.none()
+@admin.register(OPD)
+class OPDAdmin(admin.ModelAdmin):
+    list_display = ['uuid', 'kode', 'nama']
+    readonly_fields = ['uuid']
+    search_fields = ['nama', 'kode']
+    ordering = ['kode']
 
-    def save_model(self, request, obj, form, change):
-        """Auto-assign operator ke user yang sedang login"""
-        if not change:  # Saat create baru
-            obj.operator = request.user
-        super().save_model(request, obj, form, change)
-
+    # 🔒 KUNCI: Hanya Superuser yang boleh tambah/edit/hapus OPD
     def has_add_permission(self, request):
-        """Admin & Editor bisa tambah, Viewer tidak"""
-        return request.user.is_superuser or (
-            request.user.is_authenticated and request.user.role in ['admin', 'editor']
-        )
+        return request.user.is_superuser
 
     def has_change_permission(self, request, obj=None):
-        """Admin & Editor bisa edit, Viewer tidak"""
-        return request.user.is_superuser or (
-            request.user.is_authenticated and request.user.role in ['admin', 'editor']
-        )
+        return request.user.is_superuser
 
     def has_delete_permission(self, request, obj=None):
-        """Hanya Admin & Superuser yang bisa hapus"""
-        return request.user.is_superuser or (
-            request.user.is_authenticated and request.user.role == 'admin'
-        )
-
-    def has_view_permission(self, request, obj=None):
-        """Semua user login bisa lihat"""
-        return request.user.is_authenticated
+        return request.user.is_superuser
 
     def has_module_permission(self, request):
-        """Tampilkan menu di sidebar jika user adalah staff"""
+        # Agar menu terlihat di sidebar, tapi tombol Add/Change hilang jika bukan superuser
         return request.user.is_staff
 
 
 # ==========================================
-# ADMIN CUSTOM USER (STRICT PERMISSIONS)
+# 2. ADMIN CUSTOM USER (KUNCI: ADMIN OPD BISA KELOLA USER)
 # ==========================================
 class OPDUserAdmin(UserAdmin):
-    """
-    Admin khusus CustomUser dengan permission strict:
-    - Hanya role 'admin' yang bisa create/edit/delete user
-    - User hanya bisa lihat user di OPD yang sama
-    """
     model = CustomUser
     list_display = ['uuid', 'username', 'email', 'opd', 'role', 'is_staff', 'is_active']
     readonly_fields = ['uuid', 'last_login', 'date_joined']
@@ -86,7 +48,6 @@ class OPDUserAdmin(UserAdmin):
     )
 
     def get_queryset(self, request):
-        """Filter user hanya dari OPD yang sama (kecuali superuser)"""
         qs = super().get_queryset(request)
         if request.user.is_superuser:
             return qs
@@ -95,86 +56,89 @@ class OPDUserAdmin(UserAdmin):
         return qs.none()
 
     def has_add_permission(self, request):
-        """HANYA role 'admin' atau superuser yang bisa tambah user"""
+        # ✅ Admin OPD & Superuser bisa tambah user
         return request.user.is_superuser or (
             request.user.is_authenticated and request.user.role == 'admin'
         )
 
     def has_change_permission(self, request, obj=None):
-        """HANYA role 'admin' atau superuser yang bisa edit user"""
+        # ✅ Admin OPD & Superuser bisa edit user
         return request.user.is_superuser or (
             request.user.is_authenticated and request.user.role == 'admin'
         )
 
     def has_delete_permission(self, request, obj=None):
-        """HANYA role 'admin' atau superuser yang bisa hapus user"""
         return self.has_change_permission(request, obj)
 
     def has_module_permission(self, request):
-        """Tampilkan menu User di sidebar"""
         return request.user.is_staff
 
     def save_model(self, request, obj, form, change):
-        """Auto-assign OPD ke user baru (dari OPD pembuat)"""
         if not change and not obj.pk:
             obj.opd = request.user.opd
         super().save_model(request, obj, form, change)
 
 
 # ==========================================
-# REGISTER MODELS
+# 3. ADMIN FASILITAS (KUNCI: ADMIN & EDITOR BISA INPUT)
 # ==========================================
-@admin.register(OPD)
-class OPDAdmin(admin.ModelAdmin):
-    list_display = ['uuid', 'kode', 'nama']
-    readonly_fields = ['uuid']
-    search_fields = ['nama', 'kode']
-    ordering = ['kode']
+class OPDPermissionMixin:
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        if request.user.is_authenticated and hasattr(request.user, 'opd') and request.user.opd:
+            return qs.filter(operator__opd=request.user.opd)
+        return qs.none()
+
+    def save_model(self, request, obj, form, change):
+        if not change:
+            obj.operator = request.user
+        super().save_model(request, obj, form, change)
+
+    def has_add_permission(self, request):
+        # ✅ Admin & Editor bisa tambah fasilitas
+        return request.user.is_superuser or (
+            request.user.is_authenticated and request.user.role in ['admin', 'editor']
+        )
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser or (
+            request.user.is_authenticated and request.user.role in ['admin', 'editor']
+        )
+
+    def has_delete_permission(self, request, obj=None):
+        # ✅ Hanya Admin & Superuser yang bisa hapus
+        return request.user.is_superuser or (
+            request.user.is_authenticated and request.user.role == 'admin'
+        )
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_authenticated
+
+    def has_module_permission(self, request):
+        return request.user.is_staff
+
 
 @admin.register(MedicalFacility)
 class MedicalFacilityAdmin(OPDPermissionMixin, admin.GISModelAdmin):
-    gis_widget_kwargs = {
-        "attrs": {
-            "default_lon": 106.8,
-            "default_lat": -6.2,
-            "default_zoom": 10
-        }
-    }
-    list_display = ['uuid', 'nama', 'tipe', 'status', 'operator', 'date_field']
-    readonly_fields = ['uuid', 'operator', 'date_field']
-    list_filter = ['status', 'tipe', 'operator__opd']
-    search_fields = ['nama', 'koderumahsakit']
+    gis_widget_kwargs = {"attrs": {"default_lon": 106.8, "default_lat": -6.2, "default_zoom": 10}}
+    list_display = ['uuid', 'nama', 'tipe', 'status', 'operator']
+    readonly_fields = ['uuid', 'operator']
 
 @admin.register(DistrictOfficeFacility)
 class DistrictOfficeFacilityAdmin(OPDPermissionMixin, admin.GISModelAdmin):
-    gis_widget_kwargs = {
-        "attrs": {
-            "default_lon": 106.8,
-            "default_lat": -6.2,
-            "default_zoom": 10
-        }
-    }
-    list_display = ['uuid', 'nama', 'tipe', 'status', 'operator', 'date_field']
-    readonly_fields = ['uuid', 'operator', 'date_field']
-    list_filter = ['status', 'tipe', 'operator__opd']
-    search_fields = ['nama']
+    gis_widget_kwargs = {"attrs": {"default_lon": 106.8, "default_lat": -6.2, "default_zoom": 10}}
+    list_display = ['uuid', 'nama', 'tipe', 'status', 'operator']
+    readonly_fields = ['uuid', 'operator']
 
 @admin.register(CCTVFacility)
 class CCTVFacilityAdmin(OPDPermissionMixin, admin.GISModelAdmin):
-    gis_widget_kwargs = {
-        "attrs": {
-            "default_lon": 106.8,
-            "default_lat": -6.2,
-            "default_zoom": 10
-        }
-    }
-    list_display = ['uuid', 'kode_cam', 'nama_lokasi', 'wilayah', 'is_active', 'operator', 'date_field']
-    readonly_fields = ['uuid', 'operator', 'date_field']
-    list_filter = ['is_active', 'wilayah', 'operator__opd']
-    search_fields = ['kode_cam', 'nama_lokasi']
+    gis_widget_kwargs = {"attrs": {"default_lon": 106.8, "default_lat": -6.2, "default_zoom": 10}}
+    list_display = ['uuid', 'kode_cam', 'nama_lokasi', 'wilayah', 'is_active', 'operator']
+    readonly_fields = ['uuid', 'operator']
 
 @admin.register(BatasKecamatan)
 class BatasKecamatanAdmin(admin.GISModelAdmin):
     list_display = ['uuid', 'kecamatan', 'kd_kcmtan', 'tipe']
     readonly_fields = ['uuid']
-    search_fields = ['kecamatan', 'kd_kcmtan']

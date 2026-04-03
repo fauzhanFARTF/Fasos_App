@@ -3,42 +3,56 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.contrib.gis.db import models as gis_models
 from django.conf import settings
+from django.utils import timezone
+from .managers import SoftDeleteManager
 
 # ==========================================
-# 1. MASTER OPD & CUSTOM USER (DENGAN UUID)
+# 1. MASTER OPD & CUSTOM USER
 # ==========================================
 class OPD(models.Model):
-    uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True, help_text="Auto-generated unique identifier")
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True)
     nama = models.CharField(max_length=100)
     kode = models.CharField(max_length=20, unique=True)
-    
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True, editable=False)
+    objects = SoftDeleteManager()
+
     class Meta:
         verbose_name = "Organisasi Perangkat Daerah"
         verbose_name_plural = "Master OPD"
         ordering = ['kode']
 
-    def __str__(self):
-        return f"{self.kode} - {self.nama}"
+    def __str__(self): return f"{self.kode} - {self.nama}"
+    def delete(self, *args, **kwargs):
+        self.is_deleted = True; self.deleted_at = timezone.now(); self.save(update_fields=['is_deleted', 'deleted_at'])
+    def hard_delete(self, *args, **kwargs): super().delete(*args, **kwargs)
+    def restore(self): self.is_deleted = False; self.deleted_at = None; self.save(update_fields=['is_deleted', 'deleted_at'])
 
 class CustomUser(AbstractUser):
-    uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True, help_text="Auto-generated unique identifier")
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True)
     ROLE_CHOICES = [('admin', 'Admin'), ('editor', 'Editor'), ('viewer', 'Viewer')]
     opd = models.ForeignKey(OPD, on_delete=models.PROTECT, null=True, blank=True, related_name='users')
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='viewer')
-    
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True, editable=False)
+    objects = SoftDeleteManager()
+
     class Meta:
         verbose_name = "User Sistem"
         verbose_name_plural = "Manajemen User"
         ordering = ['username']
 
-    def __str__(self):
-        return f"{self.username} ({self.opd.kode if self.opd else 'No OPD'})"
+    def __str__(self): return f"{self.username} ({self.opd.kode if self.opd else 'No OPD'})"
+    def delete(self, *args, **kwargs):
+        self.is_deleted = True; self.deleted_at = timezone.now(); self.save(update_fields=['is_deleted', 'deleted_at'])
+    def hard_delete(self, *args, **kwargs): super().delete(*args, **kwargs)
+    def restore(self): self.is_deleted = False; self.deleted_at = None; self.save(update_fields=['is_deleted', 'deleted_at'])
 
 # ==========================================
 # 2. FASILITAS KESEHATAN (DINKES)
 # ==========================================
 class MedicalFacility(models.Model):
-    uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True, help_text="Auto-generated unique identifier")
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True)
     TYPE_CHOICES = [('Rumah Sakit','Rumah Sakit'), ('Puskesmas','Puskesmas'), ('Klinik', 'Klinik'), ('Apotik', 'Apotik')]
     SPESIFIC_CHOICES = [('Rumah Sakit Umum','Rumah Sakit Umum'), ('Rumah Sakit Khusus','Rumah Sakit Khusus'), ('-', '-')]
     STATUS_CHOICES = [
@@ -54,7 +68,6 @@ class MedicalFacility(models.Model):
         ('Dikelola Pemerintah', 'Dikelola Pemerintah'), ('Dikelola Swasta', 'Dikelola Swasta'),
         ('Dikelola Organisasi Sosial', 'Dikelola Organisasi Sosial'), ('Belum Mengisi Penyelenggara', 'Belum Mengisi Penyelenggara'), ('-', '-')
     ]
-    
     koderumahsakit = models.CharField(max_length=10)
     nama = models.CharField(max_length=150)
     tipe = models.CharField(max_length=50, choices=TYPE_CHOICES, default='Rumah Sakit')
@@ -70,6 +83,9 @@ class MedicalFacility(models.Model):
     photo = models.ImageField(upload_to='medical_facility/', null=True, blank=True)
     operator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='medical_facilities')
     date_field = models.DateTimeField(auto_now=True)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True, editable=False)
+    objects = SoftDeleteManager()
 
     class Meta:
         verbose_name = "Fasilitas Kesehatan"
@@ -77,13 +93,16 @@ class MedicalFacility(models.Model):
         ordering = ['-date_field']
 
     def __str__(self): return f"{self.nama} ({self.koderumahsakit})"
-
+    def delete(self, *args, **kwargs):
+        self.is_deleted = True; self.deleted_at = timezone.now(); self.save(update_fields=['is_deleted', 'deleted_at'])
+    def hard_delete(self, *args, **kwargs): super().delete(*args, **kwargs)
+    def restore(self): self.is_deleted = False; self.deleted_at = None; self.save(update_fields=['is_deleted', 'deleted_at'])
 
 # ==========================================
 # 3. KANTOR PEMERINTAH DAERAH (SETDA)
 # ==========================================
 class DistrictOfficeFacility(models.Model):
-    uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True, help_text="Auto-generated unique identifier")
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True)
     STATUS_CHOICES = [
         ('Perencanaan/Pengajuan', 'Perencanaan/Pengajuan'), ('Dalam Masa Peninjauan', 'Dalam Masa Peninjauan'),
         ('Perencanaan Dibatalkan', 'Perencanaan Dibatalkan'), ('Dalam Masa Pembangunan', 'Dalam Masa Pembangunan'),
@@ -93,7 +112,6 @@ class DistrictOfficeFacility(models.Model):
     ]
     DAYS_CHOICES = [('Setiap Hari', 'Setiap Hari'), ('Senin - Jumat', 'Senin - Jumat'), ('Sabtu - Minggu', 'Sabtu - Minggu')]
     SPESIFIC_CHOICES = [('Perangkat Daerah', 'Perangkat Daerah'), ('Instansi Vertikal', 'Instansi Vertikal')]
-    
     nama = models.CharField(max_length=150)
     tipe = models.CharField(max_length=50, choices=SPESIFIC_CHOICES, default='Perangkat Daerah')
     alamat = models.TextField(max_length=255)
@@ -105,6 +123,9 @@ class DistrictOfficeFacility(models.Model):
     photo = models.ImageField(upload_to='local_government_office/', null=True, blank=True)
     operator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='district_offices')
     date_field = models.DateTimeField(auto_now=True)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True, editable=False)
+    objects = SoftDeleteManager()
 
     class Meta:
         verbose_name = "Kantor Pemerintahan Daerah"
@@ -112,13 +133,16 @@ class DistrictOfficeFacility(models.Model):
         ordering = ['-date_field']
 
     def __str__(self): return self.nama
-
+    def delete(self, *args, **kwargs):
+        self.is_deleted = True; self.deleted_at = timezone.now(); self.save(update_fields=['is_deleted', 'deleted_at'])
+    def hard_delete(self, *args, **kwargs): super().delete(*args, **kwargs)
+    def restore(self): self.is_deleted = False; self.deleted_at = None; self.save(update_fields=['is_deleted', 'deleted_at'])
 
 # ==========================================
 # 4. CCTV MONITORING (DISKOMINFO)
 # ==========================================
 class CCTVFacility(models.Model):
-    uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True, help_text="Auto-generated unique identifier")
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True)
     STATUS_CHOICES = [
         ('Perencanaan/Pengajuan', 'Perencanaan/Pengajuan'), ('Dalam Masa Peninjauan', 'Dalam Masa Peninjauan'),
         ('Perencanaan Dibatalkan', 'Perencanaan Dibatalkan'), ('Dalam Masa Pembangunan', 'Dalam Masa Pembangunan'),
@@ -137,7 +161,6 @@ class CCTVFacility(models.Model):
         ('Polsek Panongan', 'Polsek Panongan'), ('Polsek Cikupa', 'Polsek Cikupa'), ('Polsek Cisoka', 'Polsek Cisoka'),
         ('Polresta Tangerang', 'Polresta Tangerang')
     ]
-    
     kode_cam = models.CharField(max_length=50)
     nama_lokasi = models.TextField(max_length=150)
     tipe = models.CharField(max_length=50, choices=SPESIFIC_CHOICES, default='Perangkat Keamanan Pemerintah Daerah - CCTV')
@@ -150,6 +173,9 @@ class CCTVFacility(models.Model):
     photo = models.ImageField(upload_to='cctv_etle/', null=True, blank=True)
     operator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='cctv_facilities')
     date_field = models.DateTimeField(auto_now=True)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True, editable=False)
+    objects = SoftDeleteManager()
 
     class Meta:
         verbose_name = "CCTV Monitoring"
@@ -157,20 +183,30 @@ class CCTVFacility(models.Model):
         ordering = ['-date_field']
 
     def __str__(self): return f"{self.kode_cam} - {self.nama_lokasi}"
-
+    def delete(self, *args, **kwargs):
+        self.is_deleted = True; self.deleted_at = timezone.now(); self.save(update_fields=['is_deleted', 'deleted_at'])
+    def hard_delete(self, *args, **kwargs): super().delete(*args, **kwargs)
+    def restore(self): self.is_deleted = False; self.deleted_at = None; self.save(update_fields=['is_deleted', 'deleted_at'])
 
 # ==========================================
 # 5. BATAS KECAMATAN (SPATIAL POLYGON)
 # ==========================================
 class BatasKecamatan(models.Model):
-    uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True, help_text="Auto-generated unique identifier")
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True)
     kecamatan = models.CharField(max_length=150)
     kd_kcmtan = models.CharField(max_length=20)
     tipe = models.CharField(max_length=20)
     geom = gis_models.PolygonField(srid=4326, spatial_index=True)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True, editable=False)
+    objects = SoftDeleteManager()
 
     class Meta:
         verbose_name = "Batas Kecamatan"
         verbose_name_plural = "Data Spasial Kecamatan"
     
     def __str__(self): return f"{self.kecamatan} ({self.kd_kcmtan})"
+    def delete(self, *args, **kwargs):
+        self.is_deleted = True; self.deleted_at = timezone.now(); self.save(update_fields=['is_deleted', 'deleted_at'])
+    def hard_delete(self, *args, **kwargs): super().delete(*args, **kwargs)
+    def restore(self): self.is_deleted = False; self.deleted_at = None; self.save(update_fields=['is_deleted', 'deleted_at'])

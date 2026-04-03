@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'django.contrib.gis',
+    'leaflet',
 
     'fasos',
 ]
@@ -163,3 +164,45 @@ STATIC_ROOT = BASE_DIR / 'assets' / 'static'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'assets' / 'media'
+
+
+# Leaflet Configuration
+LEAFLET_CONFIG = {
+    'DEFAULT_CENTER': (-6.2088, 106.8456),  # Jakarta/Tangerang
+    'DEFAULT_ZOOM': 13,
+    'MIN_ZOOM': 3,
+    'MAX_ZOOM': 20,
+    'SCALE': 'both',
+    'ATTRIBUTION_PREFIX': '© OpenStreetMap contributors',
+    'TILES': [
+        [
+            'OpenStreetMap',
+            'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            {'attribution': '© OpenStreetMap'}
+        ],
+        [
+            'Satellite',
+            'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+            {'attribution': '© ESRI'}
+        ]
+    ],
+    'PLUGINS': {
+        'forms': {
+            'auto-include': True,
+        },
+        'locatecontrol': {
+            'auto-include': True,
+        },
+        'search': {
+            'auto-include': True,
+            'settings': {
+                'url': 'https://nominatim.openstreetmap.org/search?format=json&q={s}',
+                'jsonpParam': 'json_callback',
+                'propertyLoc': 'display_name',
+                'autoCollapse': True,
+                'minLength': 2,
+                'autoSubmit': True,
+            }
+        }
+    }
+}

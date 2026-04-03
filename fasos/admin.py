@@ -1,144 +1,86 @@
 # fasos/admin.py
 from django.contrib.gis import admin
 from django.contrib.auth.admin import UserAdmin
+from django.utils import timezone
 from .models import OPD, CustomUser, MedicalFacility, CCTVFacility, DistrictOfficeFacility, BatasKecamatan
 
 # ==========================================
-# 1. ADMIN OPD (KUNCI: HANYA SUPERUSER)
+# ACTIONS UNTUK SOFT DELETE
+# ==========================================
+def soft_delete_selected(modeladmin, request, queryset):
+    queryset.update(is_deleted=True, deleted_at=timezone.now())
+    modeladmin.message_user(request, f"{queryset.count()} record berhasil di-soft delete.")
+soft_delete_selected.short_description = "🗑️ Soft Delete Selected"
+
+def restore_selected(modeladmin, request, queryset):
+    queryset.update(is_deleted=False, deleted_at=None)
+    modeladmin.message_user(request, f"{queryset.count()} record berhasil di-restore.")
+restore_selected.short_description = "♻️ Restore Selected"
+
+def hard_delete_selected(modeladmin, request, queryset):
+    count = queryset.count()
+    queryset.hard_delete()
+    modeladmin.message_user(request, f"{count} record dihapus permanen.")
+hard_delete_selected.short_description = "⚠️ Hard Delete Permanent"
+
+# ==========================================
+# BASE ADMIN CLASS
+# ==========================================
+class SoftDeleteAdminMixin:
+    list_display = ['uuid', 'is_deleted', 'deleted_at']
+    list_filter = ['is_deleted']
+    actions = [soft_delete_selected, restore_selected, hard_delete_selected]
+    readonly_fields = ['uuid', 'is_deleted', 'deleted_at']
+
+    def get_queryset(self, request):
+        # Tampilkan semua data (aktif & terhapus) agar bisa di-restore
+        return self.model.objects.with_deleted()
+
+# ==========================================
+# REGISTER MODELS
 # ==========================================
 @admin.register(OPD)
-class OPDAdmin(admin.ModelAdmin):
-    list_display = ['uuid', 'kode', 'nama']
-    readonly_fields = ['uuid']
+class OPDAdmin(SoftDeleteAdminMixin, admin.ModelAdmin):
+    list_display = ['uuid', 'kode', 'nama', 'is_deleted', 'deleted_at']
     search_fields = ['nama', 'kode']
     ordering = ['kode']
+    readonly_fields = ['uuid']
 
-    # 🔒 KUNCI: Hanya Superuser yang boleh tambah/edit/hapus OPD
-    def has_add_permission(self, request):
-        return request.user.is_superuser
-
-    def has_change_permission(self, request, obj=None):
-        return request.user.is_superuser
-
-    def has_delete_permission(self, request, obj=None):
-        return request.user.is_superuser
-
-    def has_module_permission(self, request):
-        # Agar menu terlihat di sidebar, tapi tombol Add/Change hilang jika bukan superuser
-        return request.user.is_staff
-
-
-# ==========================================
-# 2. ADMIN CUSTOM USER (KUNCI: ADMIN OPD BISA KELOLA USER)
-# ==========================================
-class OPDUserAdmin(UserAdmin):
+@admin.register(CustomUser)
+class CustomUserAdmin(SoftDeleteAdminMixin, UserAdmin):
     model = CustomUser
-    list_display = ['uuid', 'username', 'email', 'opd', 'role', 'is_staff', 'is_active']
-    readonly_fields = ['uuid', 'last_login', 'date_joined']
-    
-    fieldsets = UserAdmin.fieldsets + (
-        ('OPD & Role', {'fields': ('opd', 'role')}),
-    )
-    
+    list_display = ['uuid', 'username', 'email', 'opd', 'role', 'is_staff', 'is_deleted']
+    readonly_fields = ['uuid', 'last_login', 'date_joined', 'is_deleted', 'deleted_at']
+    fieldsets = UserAdmin.fieldsets + (('OPD & Role', {'fields': ('opd', 'role')}),)
     add_fieldsets = (
-        (None, {
-            'classes': ('wide',),
-            'fields': ('username', 'email', 'password1', 'password2', 'opd', 'role'),
-        }),
+        (None, {'classes': ('wide',), 'fields': ('username', 'email', 'password1', 'password2', 'opd', 'role')}),
     )
-
     def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        if request.user.is_superuser:
-            return qs
-        if request.user.is_authenticated and hasattr(request.user, 'opd') and request.user.opd:
-            return qs.filter(opd=request.user.opd)
-        return qs.none()
-
-    def has_add_permission(self, request):
-        # ✅ Admin OPD & Superuser bisa tambah user
-        return request.user.is_superuser or (
-            request.user.is_authenticated and request.user.role == 'admin'
-        )
-
-    def has_change_permission(self, request, obj=None):
-        # ✅ Admin OPD & Superuser bisa edit user
-        return request.user.is_superuser or (
-            request.user.is_authenticated and request.user.role == 'admin'
-        )
-
-    def has_delete_permission(self, request, obj=None):
-        return self.has_change_permission(request, obj)
-
-    def has_module_permission(self, request):
-        return request.user.is_staff
-
-    def save_model(self, request, obj, form, change):
-        if not change and not obj.pk:
-            obj.opd = request.user.opd
-        super().save_model(request, obj, form, change)
-
-
-# ==========================================
-# 3. ADMIN FASILITAS (KUNCI: ADMIN & EDITOR BISA INPUT)
-# ==========================================
-class OPDPermissionMixin:
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        if request.user.is_superuser:
-            return qs
-        if request.user.is_authenticated and hasattr(request.user, 'opd') and request.user.opd:
-            return qs.filter(operator__opd=request.user.opd)
-        return qs.none()
-
-    def save_model(self, request, obj, form, change):
-        if not change:
-            obj.operator = request.user
-        super().save_model(request, obj, form, change)
-
-    def has_add_permission(self, request):
-        # ✅ Admin & Editor bisa tambah fasilitas
-        return request.user.is_superuser or (
-            request.user.is_authenticated and request.user.role in ['admin', 'editor']
-        )
-
-    def has_change_permission(self, request, obj=None):
-        return request.user.is_superuser or (
-            request.user.is_authenticated and request.user.role in ['admin', 'editor']
-        )
-
-    def has_delete_permission(self, request, obj=None):
-        # ✅ Hanya Admin & Superuser yang bisa hapus
-        return request.user.is_superuser or (
-            request.user.is_authenticated and request.user.role == 'admin'
-        )
-
-    def has_view_permission(self, request, obj=None):
-        return request.user.is_authenticated
-
-    def has_module_permission(self, request):
-        return request.user.is_staff
-
+        return self.model.objects.with_deleted()
 
 @admin.register(MedicalFacility)
-class MedicalFacilityAdmin(OPDPermissionMixin, admin.GISModelAdmin):
+class MedicalFacilityAdmin(SoftDeleteAdminMixin, admin.GISModelAdmin):
     gis_widget_kwargs = {"attrs": {"default_lon": 106.8, "default_lat": -6.2, "default_zoom": 10}}
-    list_display = ['uuid', 'nama', 'tipe', 'status', 'operator']
-    readonly_fields = ['uuid', 'operator']
+    list_display = ['uuid', 'nama', 'tipe', 'status', 'operator', 'is_deleted', 'date_field']
+    list_filter = ['is_deleted', 'status', 'tipe']
+    readonly_fields = ['uuid', 'operator', 'is_deleted', 'deleted_at']
 
 @admin.register(DistrictOfficeFacility)
-class DistrictOfficeFacilityAdmin(OPDPermissionMixin, admin.GISModelAdmin):
+class DistrictOfficeFacilityAdmin(SoftDeleteAdminMixin, admin.GISModelAdmin):
     gis_widget_kwargs = {"attrs": {"default_lon": 106.8, "default_lat": -6.2, "default_zoom": 10}}
-    list_display = ['uuid', 'nama', 'tipe', 'status', 'operator']
-    readonly_fields = ['uuid', 'operator']
+    list_display = ['uuid', 'nama', 'tipe', 'status', 'operator', 'is_deleted', 'date_field']
+    list_filter = ['is_deleted', 'status', 'tipe']
+    readonly_fields = ['uuid', 'operator', 'is_deleted', 'deleted_at']
 
 @admin.register(CCTVFacility)
-class CCTVFacilityAdmin(OPDPermissionMixin, admin.GISModelAdmin):
+class CCTVFacilityAdmin(SoftDeleteAdminMixin, admin.GISModelAdmin):
     gis_widget_kwargs = {"attrs": {"default_lon": 106.8, "default_lat": -6.2, "default_zoom": 10}}
-    list_display = ['uuid', 'kode_cam', 'nama_lokasi', 'wilayah', 'is_active', 'operator']
-    readonly_fields = ['uuid', 'operator']
+    list_display = ['uuid', 'kode_cam', 'nama_lokasi', 'wilayah', 'is_active', 'operator', 'is_deleted', 'date_field']
+    list_filter = ['is_deleted', 'is_active', 'wilayah']
+    readonly_fields = ['uuid', 'operator', 'is_deleted', 'deleted_at']
 
 @admin.register(BatasKecamatan)
-class BatasKecamatanAdmin(admin.GISModelAdmin):
-    list_display = ['uuid', 'kecamatan', 'kd_kcmtan', 'tipe']
-    readonly_fields = ['uuid']
+class BatasKecamatanAdmin(SoftDeleteAdminMixin, admin.GISModelAdmin):
+    list_display = ['uuid', 'kecamatan', 'kd_kcmtan', 'tipe', 'is_deleted']
+    list_filter = ['is_deleted']
+    readonly_fields = ['uuid', 'is_deleted', 'deleted_at']

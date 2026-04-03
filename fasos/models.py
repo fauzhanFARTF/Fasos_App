@@ -1,10 +1,11 @@
+import uuid
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.contrib.gis.db import models as gis_models
 from django.conf import settings
 
 # ==========================================
-# 1. MASTER OPD & CUSTOM USER (WAJIB ADA)
+# 1. MASTER OPD & CUSTOM USER
 # ==========================================
 class OPD(models.Model):
     nama = models.CharField(max_length=100)
@@ -19,18 +20,8 @@ class OPD(models.Model):
         return f"{self.kode} - {self.nama}"
 
 class CustomUser(AbstractUser):
-    ROLE_CHOICES = [
-        ('admin', 'Admin'),
-        ('editor', 'Editor'),
-        ('viewer', 'Viewer'),
-    ]
-    opd = models.ForeignKey(
-        OPD,
-        on_delete=models.PROTECT,
-        null=True,
-        blank=True,
-        related_name='users'
-    )
+    ROLE_CHOICES = [('admin', 'Admin'), ('editor', 'Editor'), ('viewer', 'Viewer')]
+    opd = models.ForeignKey(OPD, on_delete=models.PROTECT, null=True, blank=True, related_name='users')
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='viewer')
 
     class Meta:
@@ -45,6 +36,8 @@ class CustomUser(AbstractUser):
 # 2. FASILITAS KESEHATAN (DINKES)
 # ==========================================
 class MedicalFacility(models.Model):
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True, help_text="Auto-generated unique identifier")
+
     TYPE_CHOICES = [('Rumah Sakit','Rumah Sakit'), ('Puskesmas','Puskesmas'), ('Klinik', 'Klinik'), ('Apotik', 'Apotik')]
     SPESIFIC_CHOICES = [('Rumah Sakit Umum','Rumah Sakit Umum'), ('Rumah Sakit Khusus','Rumah Sakit Khusus'), ('-', '-')]
     STATUS_CHOICES = [
@@ -89,6 +82,8 @@ class MedicalFacility(models.Model):
 # 3. KANTOR PEMERINTAH DAERAH (SETDA)
 # ==========================================
 class DistrictOfficeFacility(models.Model):
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True, help_text="Auto-generated unique identifier")
+
     STATUS_CHOICES = [
         ('Perencanaan/Pengajuan', 'Perencanaan/Pengajuan'), ('Dalam Masa Peninjauan', 'Dalam Masa Peninjauan'),
         ('Perencanaan Dibatalkan', 'Perencanaan Dibatalkan'), ('Dalam Masa Pembangunan', 'Dalam Masa Pembangunan'),
@@ -123,6 +118,8 @@ class DistrictOfficeFacility(models.Model):
 # 4. CCTV MONITORING (DISKOMINFO)
 # ==========================================
 class CCTVFacility(models.Model):
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True, help_text="Auto-generated unique identifier")
+
     STATUS_CHOICES = [
         ('Perencanaan/Pengajuan', 'Perencanaan/Pengajuan'), ('Dalam Masa Peninjauan', 'Dalam Masa Peninjauan'),
         ('Perencanaan Dibatalkan', 'Perencanaan Dibatalkan'), ('Dalam Masa Pembangunan', 'Dalam Masa Pembangunan'),
@@ -167,6 +164,8 @@ class CCTVFacility(models.Model):
 # 5. BATAS KECAMATAN (SPATIAL POLYGON)
 # ==========================================
 class BatasKecamatan(models.Model):
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True, help_text="Auto-generated unique identifier")
+
     kecamatan = models.CharField(max_length=150)
     kd_kcmtan = models.CharField(max_length=20)
     tipe = models.CharField(max_length=20)

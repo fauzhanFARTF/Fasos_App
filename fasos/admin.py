@@ -19,7 +19,6 @@ class CustomUserAdmin(admin.ModelAdmin):
     list_display = ['username', 'email', 'opd', 'role', 'is_staff']
     list_filter = ['opd', 'role', 'is_staff']
     search_fields = ['username', 'email']
-
     fieldsets = (
         (None, {'fields': ('username', 'password')}),
         ('Personal Info', {'fields': ('first_name', 'last_name', 'email')}),
@@ -27,9 +26,7 @@ class CustomUserAdmin(admin.ModelAdmin):
         ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
         ('Important Dates', {'fields': ('last_login', 'date_joined')}),
     )
-    add_fieldsets = (
-        (None, {'classes': ('wide',), 'fields': ('username', 'email', 'opd', 'role', 'password1', 'password2')}),
-    )
+    add_fieldsets = ((None, {'classes': ('wide',), 'fields': ('username', 'email', 'opd', 'role', 'password1', 'password2')}),)
 
 # ==========================================
 # 3. ADMIN MEDICAL FACILITY (GIS)
@@ -62,5 +59,5 @@ class CCTVFacilityAdmin(admin.GISModelAdmin):
 # ==========================================
 
 @admin.register(BatasKecamatan)
-class BatasKecamatanAdmin(admin.OSMGeoAdmin): # Note: PolygonField works fine with GISModelAdmin too
+class BatasKecamatanAdmin(admin.GISModelAdmin):  # ✅ Fixed
     list_display = ['kecamatan', 'kd_kcmtan', 'tipe']

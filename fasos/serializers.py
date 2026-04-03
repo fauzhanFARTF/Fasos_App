@@ -22,17 +22,21 @@ class BaseFacilitySerializer(serializers.ModelSerializer):
 class MedicalFacilitySerializer(BaseFacilitySerializer):
     class Meta:
         model = MedicalFacility
-        fields = '__all__'
-        read_only_fields = ['operator', 'date_field']
+        fields = ['uuid', 'koderumahsakit', 'nama', 'tipe', 'jenis', 'tingkatan', 'kepemilikan',
+                  'alamat', 'no_telp', 'status', 'hari_beroperasi', 'jam_beroperasi',
+                  'location', 'photo', 'operator', 'date_field']
+        read_only_fields = ['uuid', 'operator', 'date_field']
 
 class DistrictOfficeFacilitySerializer(BaseFacilitySerializer):
     class Meta:
         model = DistrictOfficeFacility
-        fields = '__all__'
-        read_only_fields = ['operator', 'date_field']
+        fields = ['uuid', 'nama', 'tipe', 'alamat', 'no_telp', 'status',
+                  'hari_beroperasi', 'jam_beroperasi', 'location', 'photo', 'operator', 'date_field']
+        read_only_fields = ['uuid', 'operator', 'date_field']
 
 class CCTVFacilitySerializer(BaseFacilitySerializer):
     class Meta:
         model = CCTVFacility
-        fields = '__all__'
-        read_only_fields = ['operator', 'date_field']
+        fields = ['uuid', 'kode_cam', 'nama_lokasi', 'tipe', 'wilayah', 'sn_camera',
+                  'sn_modem', 'tgl_pemasangan', 'is_active', 'location', 'photo', 'operator', 'date_field']
+        read_only_fields = ['uuid', 'operator', 'date_field']

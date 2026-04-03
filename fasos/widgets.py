@@ -4,7 +4,7 @@ from django.utils.safestring import mark_safe
 
 
 class SearchableLeafletWidget(forms.TextInput):
-    """Widget GIS dengan Leaflet + Search + Locate + Edit/Delete + Scale"""
+    """Widget GIS dengan Leaflet + Multi-Basemap + Search + Locate + Edit/Delete"""
     
     class Media:
         css = {
@@ -22,9 +22,10 @@ class SearchableLeafletWidget(forms.TextInput):
         
         init_html = f"""
         <div style="margin-top: 10px;">
-            <!-- ✅ Lebar diperbesar dengan min-width: 750px -->
+            <!-- ✅ Peta Lebar: min-width 750px -->
             <div id="{widget_id}_map" style="height: 450px; width: 100%; min-width: 750px; max-width: 100%; border: 1px solid #ccc; border-radius: 4px; position: relative;">
-                <!-- Search Box -->
+                
+                <!-- Search Box (Tetap di Atas Kiri, agak geser dikit biar gak nabrak tombol vertikal) -->
                 <div id="{widget_id}_search_container" style="position: absolute; top: 10px; left: 60px; z-index: 1000; background: white; padding: 5px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">
                     <input type="text" id="{widget_id}_search" placeholder="Cari lokasi..." 
                            style="padding: 5px 10px; width: 250px; border: 1px solid #ddd; border-radius: 3px;">
@@ -32,18 +33,24 @@ class SearchableLeafletWidget(forms.TextInput):
                             style="padding: 5px 10px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; margin-left: 5px;">🔍</button>
                 </div>
                 
-                <!-- Control Buttons -->
-                <div id="{widget_id}_controls" style="position: absolute; bottom: 10px; left: 10px; z-index: 1000; display: flex; gap: 5px;">
+                <!-- ✅ Control Buttons: VERTICAL di KIRI, di bawah Zoom -->
+                <div id="{widget_id}_controls" style="position: absolute; top: 90px; left: 10px; z-index: 1000; display: flex; flex-direction: column; gap: 5px;">
                     <button type="button" id="{widget_id}_locate_btn" title="Gunakan lokasi saya"
-                            style="width: 30px; height: 30px; background: white; border: 2px solid rgba(0,0,0,0.2); border-radius: 4px; cursor: pointer; font-size: 16px;">📍</button>
+                            style="width: 30px; height: 30px; background: white; border: 2px solid rgba(0,0,0,0.2); border-radius: 4px; cursor: pointer; font-size: 16px; box-shadow: 0 1px 5px rgba(0,0,0,0.4);">
+                        📍
+                    </button>
                     <button type="button" id="{widget_id}_edit_btn" title="Edit titik lokasi"
-                            style="width: 30px; height: 30px; background: white; border: 2px solid rgba(0,0,0,0.2); border-radius: 4px; cursor: pointer; font-size: 16px;">✏️</button>
+                            style="width: 30px; height: 30px; background: white; border: 2px solid rgba(0,0,0,0.2); border-radius: 4px; cursor: pointer; font-size: 16px; box-shadow: 0 1px 5px rgba(0,0,0,0.4);">
+                        ✏️
+                    </button>
                     <button type="button" id="{widget_id}_delete_btn" title="Hapus titik lokasi"
-                            style="width: 30px; height: 30px; background: white; border: 2px solid rgba(0,0,0,0.2); border-radius: 4px; cursor: pointer; font-size: 16px;">🗑️</button>
+                            style="width: 30px; height: 30px; background: white; border: 2px solid rgba(0,0,0,0.2); border-radius: 4px; cursor: pointer; font-size: 16px; box-shadow: 0 1px 5px rgba(0,0,0,0.4);">
+                        🗑️
+                    </button>
                 </div>
             </div>
             <div style="margin-top: 5px; color: #666; font-size: 12px;">
-                💡 Klik peta untuk set lokasi | 📍 GPS | ️ Edit (seret) | 🗑️ Hapus
+                💡 Klik peta untuk set lokasi | 📍 GPS | ️ Edit (seret) | 🗑️ Hapus | Gunakan ikon 📚 di kanan atas untuk ganti basemap
             </div>
         </div>
         
@@ -62,24 +69,37 @@ class SearchableLeafletWidget(forms.TextInput):
             
             if (!mapContainer || !hiddenInput) return;
             
-            // ✅ Sembunyikan input koordinat agar tidak tampil di form Django
             hiddenInput.type = 'hidden';
             hiddenInput.style.display = 'none';
-            
             console.log('🗺️ [SearchableLeafletWidget] Ready');
 
             // Inisialisasi Peta
             var map = L.map(mapContainer).setView([-6.2088, 106.8456], 13);
-            L.tileLayer('https://{{s}}.basemaps.cartocdn.com/light_all/{{z}}/{{x}}/{{y}}{{r}}.png', {{
+
+            // 🌍 DEFINISI BASEMAPS
+            var cartoLayer = L.tileLayer('https://{{s}}.basemaps.cartocdn.com/light_all/{{z}}/{{x}}/{{y}}{{r}}.png', {{
                 attribution: '&copy; OpenStreetMap &copy; CARTO', subdomains: 'abcd', maxZoom: 20
-            }}).addTo(map);
+            }});
+            var satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{{z}}/{{y}}/{{x}}', {{
+                attribution: 'Tiles &copy; Esri', maxZoom: 19
+            }});
+            var osmLayer = L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
+                attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
+            }});
+
+            cartoLayer.addTo(map);
+            L.control.layers({{
+                "🗺️ CartoDB (Bersih)": cartoLayer,
+                "🛰️ Satellite (ESRI)": satelliteLayer,
+                "🛣️ OpenStreetMap": osmLayer
+            }}, null, {{ collapsed: true }}).addTo(map);
             
             L.control.scale({{ position: 'bottomright', metric: true, imperial: true, maxWidth: 100 }}).addTo(map);
 
+            // 🛠️ LOGIKA WIDGET
             var marker = null;
             var isEditMode = false;
 
-            // Fungsi update koordinat
             function updateCoords(lat, lng, source) {{
                 if (!lat || !lng) return;
                 hiddenInput.value = "POINT(" + lng + " " + lat + ")";
@@ -97,12 +117,11 @@ class SearchableLeafletWidget(forms.TextInput):
                 }}
             }}
 
-            // Klik peta (hanya jalan jika TIDAK dalam mode edit)
             map.on('click', function(e) {{
                 if (!isEditMode) updateCoords(e.latlng.lat, e.latlng.lng, 'click');
             }});
 
-            // 🔍 Search Function
+            // 🔍 Search
             async function searchLocation(e) {{
                 if(e) e.stopPropagation();
                 var query = searchInput.value.trim();
@@ -119,7 +138,6 @@ class SearchableLeafletWidget(forms.TextInput):
                 }} catch (err) {{ console.error(err); alert('Error search'); }}
             }}
             
-            // ✅ Stop propagation di semua elemen UI agar tidak memicu klik peta
             searchBtn.addEventListener('click', e => {{ e.stopPropagation(); searchLocation(); }});
             searchInput.addEventListener('keypress', e => {{
                 e.stopPropagation();
@@ -128,7 +146,7 @@ class SearchableLeafletWidget(forms.TextInput):
             searchContainer.addEventListener('click', e => e.stopPropagation());
             controlsDiv.addEventListener('click', e => e.stopPropagation());
 
-            // 📍 Locate Me Button
+            // 📍 Locate Me
             if (locateBtn) {{
                 locateBtn.addEventListener('click', function(e) {{
                     e.stopPropagation();
@@ -148,7 +166,7 @@ class SearchableLeafletWidget(forms.TextInput):
                 }});
             }}
 
-            // ✏️ Edit Button
+            // ✏️ Edit
             if (editBtn) {{
                 editBtn.addEventListener('click', function(e) {{
                     e.stopPropagation();
@@ -157,7 +175,7 @@ class SearchableLeafletWidget(forms.TextInput):
                     if (isEditMode) {{
                         marker.dragging.enable();
                         editBtn.style.background = '#fff3cd';
-                        console.log('✏️ Edit mode: ON (Seret marker untuk pindah)');
+                        console.log('✏️ Edit mode: ON');
                     }} else {{
                         marker.dragging.disable();
                         editBtn.style.background = 'white';
@@ -166,7 +184,7 @@ class SearchableLeafletWidget(forms.TextInput):
                 }});
             }}
 
-            // 🗑️ Delete Button
+            // 🗑️ Delete
             if (deleteBtn) {{
                 deleteBtn.addEventListener('click', function(e) {{
                     e.stopPropagation();
@@ -182,7 +200,7 @@ class SearchableLeafletWidget(forms.TextInput):
                 }});
             }}
 
-            // Load data awal jika ada
+            // Load data awal
             if (hiddenInput.value && hiddenInput.value.startsWith('POINT(')) {{
                 var c = hiddenInput.value.replace('POINT(', '').replace(')', '').split(' ');
                 if (c.length === 2) updateCoords(parseFloat(c[1]), parseFloat(c[0]), 'init');

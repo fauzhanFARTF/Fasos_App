@@ -34,7 +34,8 @@ class CustomUserAdmin(admin.ModelAdmin):
 @admin.register(MedicalFacility)
 class MedicalFacilityAdmin(admin.GISModelAdmin):
     gis_widget_kwargs = {"attrs": {"default_lon": 106.8, "default_lat": -6.2, "default_zoom": 10}}
-    list_display = ['nama', 'tipe', 'status', 'operator']
+    list_display = ['uuid', 'nama', 'tipe', 'status', 'operator']
+    readonly_fields = ['uuid']
 
 # ==========================================
 # 4. ADMIN DISTRICT OFFICE FACILITY (GIS)
@@ -43,7 +44,8 @@ class MedicalFacilityAdmin(admin.GISModelAdmin):
 @admin.register(DistrictOfficeFacility)
 class DistrictOfficeFacilityAdmin(admin.GISModelAdmin):
     gis_widget_kwargs = {"attrs": {"default_lon": 106.8, "default_lat": -6.2, "default_zoom": 10}}
-    list_display = ['nama', 'tipe', 'status', 'operator']
+    list_display = ['uuid', 'nama', 'tipe', 'status', 'operator']
+    readonly_fields = ['uuid']
     
 # ==========================================
 # 5. ADMINCCTV FACILITY (GIS)
@@ -52,12 +54,14 @@ class DistrictOfficeFacilityAdmin(admin.GISModelAdmin):
 @admin.register(CCTVFacility)
 class CCTVFacilityAdmin(admin.GISModelAdmin):
     gis_widget_kwargs = {"attrs": {"default_lon": 106.8, "default_lat": -6.2, "default_zoom": 10}}
-    list_display = ['kode_cam', 'nama_lokasi', 'wilayah', 'is_active', 'operator']
+    list_display = ['uuid', 'kode_cam', 'nama_lokasi', 'wilayah', 'is_active', 'operator']
+    readonly_fields = ['uuid']
 
 # ==========================================
 # 6. ADMIN BATAS KECAMATAN (GIS)
 # ==========================================
 
 @admin.register(BatasKecamatan)
-class BatasKecamatanAdmin(admin.GISModelAdmin):  # ✅ Fixed
-    list_display = ['kecamatan', 'kd_kcmtan', 'tipe']
+class BatasKecamatanAdmin(admin.GISModelAdmin):
+    list_display = ['uuid', 'kecamatan', 'kd_kcmtan', 'tipe']
+    readonly_fields = ['uuid']

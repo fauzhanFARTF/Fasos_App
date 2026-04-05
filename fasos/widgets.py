@@ -4,7 +4,7 @@ from django.utils.safestring import mark_safe
 
 
 class SearchableLeafletWidget(forms.TextInput):
-    """Widget GIS dengan Leaflet - Search, GPS, Edit Mode, Lock Click on Edit"""
+    """Widget GIS dengan Leaflet - Map Click Locked, GPS & Search Only"""
     
     class Media:
         css = {
@@ -20,15 +20,13 @@ class SearchableLeafletWidget(forms.TextInput):
         html = super().render(name, value, attrs, renderer)
         widget_id = attrs.get('id', name)
         
-        # SVG Icon Custom
         custom_icon_html = '''<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="#e74c3c" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>'''
         
         init_html = f"""
         <div style="margin-top: 10px;">
-            <!-- Container Peta -->
             <div id="{widget_id}_map" style="height: 450px; width: 100%; min-width: 750px; max-width: 100%; border: 1px solid #ccc; border-radius: 4px; position: relative;">
                 
-                <!-- Search Box (Fungsional) -->
+                <!-- Search Box -->
                 <div id="{widget_id}_search_container" style="position: absolute; top: 10px; left: 60px; z-index: 1000; background: white; padding: 5px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">
                     <input type="text" id="{widget_id}_search" placeholder="Cari lokasi..." 
                            style="padding: 5px 10px; width: 250px; border: 1px solid #ddd; border-radius: 3px;">
@@ -48,7 +46,7 @@ class SearchableLeafletWidget(forms.TextInput):
             </div>
             
             <div style="margin-top: 5px; color: #666; font-size: 12px;">
-                💡 Tambah Data: Klik peta | Edit Data: Gunakan ✏️ untuk drag | 🔍 Search atau 📍 GPS untuk override
+                🔒 Klik peta dinonaktifkan | Gunakan 📍 GPS atau 🔍 Search untuk set lokasi | ✏️ Drag untuk fine-tune
             </div>
         </div>
         
@@ -75,13 +73,9 @@ class SearchableLeafletWidget(forms.TextInput):
             hiddenInput.type = 'hidden';
             hiddenInput.style.display = 'none';
             
-            // Cek apakah ini form Edit (ada data) atau Add (kosong)
-            var isExistingData = (hiddenInput.value && hiddenInput.value.includes('POINT'));
-            
-            // 1. Inisialisasi Peta
+            // Inisialisasi Peta
             var map = L.map(mapContainer).setView([-6.2088, 106.8456], 13);
             
-            // Layer Peta
             var cartoLayer = L.tileLayer('https://{{s}}.basemaps.cartocdn.com/light_all/{{z}}/{{x}}/{{y}}{{r}}.png', {{
                 attribution: '&copy; OpenStreetMap &copy; CARTO', subdomains: 'abcd', maxZoom: 20
             }});
@@ -97,7 +91,6 @@ class SearchableLeafletWidget(forms.TextInput):
             
             L.control.scale({{ position: 'bottomright', metric: true, maxWidth: 100 }}).addTo(map);
             
-            // Icon Marker Custom
             var customIcon = L.divIcon({{
                 className: 'custom-map-pin',
                 html: '{custom_icon_html}',
@@ -107,61 +100,48 @@ class SearchableLeafletWidget(forms.TextInput):
             }});
             
             var marker = null;
-            var isEditMode = false; // Default OFF
+            var isEditMode = false;
 
-            // 🔧 FUNGSI UPDATE KOORDINAT (Pusat dari segala aksi)
+            // 🔧 FUNGSI UPDATE KOORDINAT (Hanya dipanggil oleh GPS, Search, & Drag)
             function updateCoords(lat, lng, popupText) {{
                 if (!lat || !lng) return;
-                
-                // Format GeoDjango: POINT(LNG LAT)
                 hiddenInput.value = "POINT(" + lng + " " + lat + ")";
-                
                 if (marker) map.removeLayer(marker);
                 
-                // Marker bisa di-drag hanya jika isEditMode true
                 marker = L.marker([lat, lng], {{icon: customIcon, draggable: isEditMode}}).addTo(map);
                 
-                // Tampilkan Popup
                 var latStr = lat.toFixed(5);
                 var lngStr = lng.toFixed(5);
-                marker.bindPopup(popupText || '<b>📍 Lokasi Baru</b><br>Lat: ' + latStr + '<br>Lng: ' + lngStr).openPopup();
+                marker.bindPopup(popupText || '<b>📍 Lokasi Diperbarui</b><br>Lat: ' + latStr + '<br>Lng: ' + lngStr).openPopup();
                 
-                // Event saat Drag selesai
                 marker.on('dragend', function(e) {{
                     var pos = e.target.getLatLng();
                     hiddenInput.value = "POINT(" + pos.lng + " " + pos.lat + ")";
-                    marker.bindPopup('<b>✅ Lokasi Diperbarui</b><br>Lat: ' + pos.lat.toFixed(5) + '<br>Lng: ' + pos.lng.toFixed(5)).openPopup();
+                    marker.bindPopup('<b>✅ Lokasi Diperbarui (Drag)</b><br>Lat: ' + pos.lat.toFixed(5) + '<br>Lng: ' + pos.lng.toFixed(5)).openPopup();
                 }});
                 
                 console.log('📍 Koordinat diset:', latStr, lngStr);
             }}
 
-            // 🖱️ KLIK PETA: Hanya aktif saat MODE TAMBAH (!isExistingData) DAN Edit Mode OFF
+            // 🔒 KLIK PETA: SEPENUHNYA DIKUNCI
             map.on('click', function(e) {{
-                if (!isEditMode && !isExistingData) {{
-                    updateCoords(e.latlng.lat, e.latlng.lng);
-                }}
+                console.log('🔒 Klik peta dinonaktifkan. Gunakan tombol 📍 GPS atau 🔍 Search.');
+                // Tidak ada updateCoords di sini
             }});
             
-            // 🔍 LOGIKA SEARCH (Fungsional)
+            // 🔍 SEARCH FUNCTION
             async function searchLocation() {{
                 var query = searchInput.value.trim();
-                if (!query) {{ alert('Masukkan nama lokasi untuk dicari'); return; }}
-                
-                searchBtn.innerHTML = '⏳'; // Loading icon
-                
+                if (!query) {{ alert('Masukkan nama lokasi'); return; }}
+                searchBtn.innerHTML = '⏳';
                 try {{
-                    // API Nominatim OpenStreetMap
                     var url = 'https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query);
                     var res = await fetch(url);
                     var data = await res.json();
-                    
                     if (data.length > 0) {{
                         var lat = parseFloat(data[0].lat);
-                        var lng = parseFloat(data[0].lon); // Nominatim pakai 'lon'
+                        var lng = parseFloat(data[0].lon);
                         var name = data[0].display_name;
-                        
-                        // Update koordinat & Map
                         updateCoords(lat, lng, '<b>🔍 ' + name + '</b><br>Lat: ' + lat.toFixed(5) + '<br>Lng: ' + lng.toFixed(5));
                         map.flyTo([lat, lng], 16, {{animate: true, duration: 1.5}});
                     }} else {{
@@ -171,31 +151,24 @@ class SearchableLeafletWidget(forms.TextInput):
                     console.error('Search Error:', err);
                     alert('Gagal mencari lokasi.');
                 }} finally {{
-                    searchBtn.innerHTML = '🔍'; // Reset icon
+                    searchBtn.innerHTML = '🔍';
                 }}
             }}
             
-            // Event Listeners Search
             if (searchBtn) searchBtn.addEventListener('click', function(e) {{ e.preventDefault(); e.stopPropagation(); searchLocation(); }});
             if (searchInput) searchInput.addEventListener('keypress', function(e) {{
-                if(e.key === 'Enter') {{
-                    e.preventDefault(); 
-                    e.stopPropagation();
-                    searchLocation();
-                }}
+                if(e.key === 'Enter') {{ e.preventDefault(); e.stopPropagation(); searchLocation(); }}
             }});
             
-            // Stop Propagation agar klik input tidak klik peta
             if (searchContainer) {{
                 searchContainer.addEventListener('click', function(e) {{ e.preventDefault(); e.stopPropagation(); }});
             }}
             
-            // 📍 LOGIKA GPS
+            // 📍 GPS LOCATE
             if (locateBtn) {{
                 locateBtn.addEventListener('click', function(e) {{
                     e.preventDefault(); e.stopPropagation();
                     if (!navigator.geolocation) {{ alert('Browser tidak mendukung GPS'); return; }}
-                    
                     locateBtn.innerHTML = '⏳';
                     navigator.geolocation.getCurrentPosition(
                         pos => {{ 
@@ -203,39 +176,35 @@ class SearchableLeafletWidget(forms.TextInput):
                             map.flyTo([pos.coords.latitude, pos.coords.longitude], 17);
                             locateBtn.innerHTML = '📍';
                         }},
-                        err => {{ 
-                            alert('Gagal mengambil lokasi: ' + err.message); 
-                            locateBtn.innerHTML = '📍'; 
-                        }},
+                        err => {{ alert('Gagal: ' + err.message); locateBtn.innerHTML = '📍'; }},
                         {{enableHighAccuracy: true, timeout: 10000}}
                     );
                 }});
             }}
             
-            // ✏️ LOGIKA EDIT (Drag)
+            // ✏️ EDIT (DRAG) TOGGLE
             if (editBtn) {{
                 editBtn.addEventListener('click', function(e) {{
                     e.preventDefault(); e.stopPropagation();
-                    if (!marker) {{ alert('Pilih lokasi dulu (via klik/search/gps)'); return; }}
+                    if (!marker) {{ alert('Tentukan lokasi dulu via 📍 GPS atau 🔍 Search'); return; }}
                     
                     isEditMode = !isEditMode;
-                    
                     if (isEditMode) {{
                         marker.dragging.enable();
                         editBtn.style.background = '#fff3cd';
                         editBtn.title = 'Selesai Edit (Klik Lagi)';
-                        marker.bindPopup('<b>✏️ Mode Edit ON</b><br>Seret marker untuk pindah').openPopup();
+                        marker.bindPopup('<b>✏️ Mode Edit ON</b><br>Seret marker untuk fine-tune').openPopup();
                     }} else {{
                         marker.dragging.disable();
                         editBtn.style.background = 'white';
-                        editBtn.title = 'Edit Titik Lokasi';
+                        editBtn.title = 'Edit Titik Lokasi (Drag)';
                         var pos = marker.getLatLng();
                         marker.bindPopup('<b>🔒 Mode Edit OFF</b><br>Lat: ' + pos.lat.toFixed(5) + '<br>Lng: ' + pos.lng.toFixed(5)).openPopup();
                     }}
                 }});
             }}
             
-            // 🗑️ LOGIKA HAPUS
+            // 🗑️ DELETE
             if (deleteBtn) {{
                 deleteBtn.addEventListener('click', function(e) {{
                     e.preventDefault(); e.stopPropagation();
@@ -250,19 +219,15 @@ class SearchableLeafletWidget(forms.TextInput):
                 }});
             }}
             
-            // 🟢 LOAD DATA EXISTING (Edit Mode)
+            // 🟢 LOAD EXISTING DATA
             function loadExistingData() {{
                 var existingValue = hiddenInput.value;
-                console.log('🔍 Checking existing value:', existingValue);
-                
-                if (isExistingData) {{
-                    console.log('🔄 [Edit Mode] Found existing data');
-                    // Format: POINT(LNG LAT)
+                if (existingValue && existingValue.includes('POINT')) {{
+                    console.log('🔄 [Edit Mode] Loading existing data');
                     var match = existingValue.match(/POINT\\s*\\(\\s*([\\d.\\-]+)\\s+([\\d.\\-]+)\\s*\\)/);
                     if (match) {{
                         var lng = parseFloat(match[1]);
                         var lat = parseFloat(match[2]);
-                        
                         if (!isNaN(lat) && !isNaN(lng)) {{
                             setTimeout(function() {{
                                 map.setView([lat, lng], 16);
@@ -279,7 +244,6 @@ class SearchableLeafletWidget(forms.TextInput):
             }} else {{
                 setTimeout(loadExistingData, 200);
             }}
-            
         }})();
         </script>
         """

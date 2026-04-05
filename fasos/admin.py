@@ -37,34 +37,21 @@ class MedicalFacilityForm(forms.ModelForm):
         fields = '__all__'
 
     class Media:
-        # ✅ Load JS yang baru dibuat
         js = ('fasos/js/medical_facility_admin.js',)
 
     def clean(self):
-        """
-        ✅ Validasi Server-Side:
-        Memastikan Jenis & Tingkatan otomatis menjadi '-' jika Tipe bukan Rumah Sakit.
-        Ini mencegah data tidak konsisten jika user bypass JS.
-        """
         cleaned_data = super().clean()
         tipe = cleaned_data.get('tipe')
-        
         if tipe != 'Rumah Sakit':
             cleaned_data['jenis'] = '-'
             cleaned_data['tingkatan'] = '-'
-            
         return cleaned_data
-
 
 
 # ==========================================
 # CUSTOM FILTER: DEFAULT KE "NO" (AKTIF)
 # ==========================================
 class ActiveStatusFilter(SimpleListFilter):
-    """
-    Filter kustom yang default-nya menampilkan data Aktif (is_deleted=False).
-    User tetap bisa klik 'Terhapus' untuk melihat data soft delete.
-    """
     title = 'Status Data'
     parameter_name = 'is_deleted'
 
@@ -76,16 +63,11 @@ class ActiveStatusFilter(SimpleListFilter):
         )
 
     def queryset(self, request, queryset):
-        # Jika tidak ada parameter filter di URL (default load), tampilkan yang Aktif saja
         if self.value() is None:
             return queryset.filter(is_deleted=False)
-        
-        if self.value() == 'no':
-            return queryset.filter(is_deleted=False)
-        if self.value() == 'yes':
-            return queryset.filter(is_deleted=True)
-        if self.value() == 'all':
-            return queryset
+        if self.value() == 'no': return queryset.filter(is_deleted=False)
+        if self.value() == 'yes': return queryset.filter(is_deleted=True)
+        if self.value() == 'all': return queryset
         return queryset
 
 
@@ -93,25 +75,24 @@ class ActiveStatusFilter(SimpleListFilter):
 # MIXIN: SOFT DELETE ADMIN
 # ==========================================
 class SoftDeleteAdminMixin:
-    # ✅ Gunakan Custom Filter di sini agar berlaku global
     list_filter = [ActiveStatusFilter]
     actions = [soft_delete_selected, restore_selected, hard_delete_selected]
 
     def get_queryset(self, request):
-        # Tetap return with_deleted() agar filter 'Yes' bisa berfungsi
         return self.model.objects.with_deleted()
 
 
 # ==========================================
-# MIXIN: UUID DISPLAY & TIMESTAMPS
+# MIXIN: DISPLAY NAME & TIMESTAMPS
 # ==========================================
 class UUIDTimestampMixin:
-    """Mixin untuk menampilkan UUID creator, OPD, dan Timestamp di Admin"""
+    """Mixin untuk menampilkan Nama Creator, OPD, dan Timestamp di Admin"""
     
-    def created_by_uuid(self, obj):
-        return obj.created_by.uuid if obj.created_by else "-"
-    created_by_uuid.short_description = "Created By (UUID)"
-    created_by_uuid.admin_order_field = 'created_by__uuid'
+    # ✅ PERBAIKAN: Tampilkan USERNAME bukan UUID
+    def created_by_name(self, obj):
+        return obj.created_by.username if obj.created_by else "-"
+    created_by_name.short_description = "Created By"
+    created_by_name.admin_order_field = 'created_by__username'
     
     def opd_uuid(self, obj):
         return obj.opd.uuid if obj.opd else "-"
@@ -130,7 +111,7 @@ class UUIDTimestampMixin:
 # ==========================================
 @admin.register(OPD)
 class OPDAdmin(SoftDeleteAdminMixin, UUIDTimestampMixin, admin.ModelAdmin):
-    list_display = ['uuid', 'kode', 'nama', 'created_by_uuid', 'created_at', 'updated_at', 'is_deleted']
+    list_display = ['uuid', 'kode', 'nama', 'created_by_name', 'created_at', 'updated_at', 'is_deleted']
     
     readonly_fields = [
         'uuid', 'created_by', 'created_by_detail', 'created_at', 'updated_at', 'is_deleted', 'deleted_at'
@@ -155,7 +136,7 @@ class OPDAdmin(SoftDeleteAdminMixin, UUIDTimestampMixin, admin.ModelAdmin):
 @admin.register(CustomUser)
 class CustomUserAdmin(SoftDeleteAdminMixin, UUIDTimestampMixin, UserAdmin):
     model = CustomUser
-    list_display = ['uuid', 'username', 'email', 'opd_uuid', 'role', 'created_by_uuid', 'created_at', 'updated_at', 'is_staff', 'is_active', 'is_deleted']
+    list_display = ['uuid', 'username', 'email', 'opd_uuid', 'role', 'created_by_name', 'created_at', 'updated_at', 'is_staff', 'is_active', 'is_deleted']
     
     readonly_fields = [
         'uuid', 'last_login', 'date_joined', 'created_by', 'created_by_detail', 'created_at', 'updated_at', 'is_deleted', 'deleted_at'
@@ -199,10 +180,8 @@ class CustomUserAdmin(SoftDeleteAdminMixin, UUIDTimestampMixin, UserAdmin):
         )
 
     def get_fieldsets(self, request, obj=None):
-        if obj is None:
-            return self.get_add_fieldsets(request)
-        if request.user.is_superuser:
-            return self.fieldsets
+        if obj is None: return self.get_add_fieldsets(request)
+        if request.user.is_superuser: return self.fieldsets
         
         fieldsets_list = []
         for name, opts in self.fieldsets:
@@ -210,9 +189,7 @@ class CustomUserAdmin(SoftDeleteAdminMixin, UUIDTimestampMixin, UserAdmin):
             if 'opd' in fields:
                 fields.remove('opd')
                 fieldsets_list.append((name, {'fields': fields}))
-                fieldsets_list.append(('OPD (Tidak dapat diubah)', {
-                    'fields': ('opd',), 'classes': ('collapse',)
-                }))
+                fieldsets_list.append(('OPD (Tidak dapat diubah)', {'fields': ('opd',), 'classes': ('collapse',)}))
             else:
                 fieldsets_list.append((name, opts))
         return tuple(fieldsets_list)
@@ -226,10 +203,8 @@ class CustomUserAdmin(SoftDeleteAdminMixin, UUIDTimestampMixin, UserAdmin):
         return tuple(readonly)
 
     def save_model(self, request, obj, form, change):
-        if not request.user.is_superuser and request.user.opd:
-            obj.opd = request.user.opd
-        if not obj.pk:
-            obj.created_by = request.user
+        if not request.user.is_superuser and request.user.opd: obj.opd = request.user.opd
+        if not obj.pk: obj.created_by = request.user
         super().save_model(request, obj, form, change)
         if not change and obj.opd:
             self.message_user(request, f"User {obj.username} berhasil dibuat untuk OPD: {obj.opd.nama}", level=messages.SUCCESS)
@@ -268,13 +243,10 @@ class OPDPermissionMixin:
     def has_module_permission(self, request):
         if request.user.is_superuser: return True
         user = request.user
-        if not user.is_authenticated or not hasattr(user, 'opd') or not user.opd:
-            return False
+        if not user.is_authenticated or not hasattr(user, 'opd') or not user.opd: return False
         model_name = self.model.__name__
-        if model_name in ['OPD', 'CustomUser']:
-            return user.role in ['admin', 'editor']
-        allowed = self.ALLOWED_FACILITY_MODELS.get(user.opd.kode, [])
-        return model_name in allowed
+        if model_name in ['OPD', 'CustomUser']: return user.role in ['admin', 'editor']
+        return model_name in self.ALLOWED_FACILITY_MODELS.get(user.opd.kode, [])
 
     def get_queryset(self, request):
         qs = super().get_queryset(request).select_related('created_by')
@@ -289,32 +261,28 @@ class OPDPermissionMixin:
 
     def has_add_permission(self, request):
         return request.user.is_superuser or (request.user.is_authenticated and request.user.role in ['admin', 'editor'])
-
     def has_change_permission(self, request, obj=None):
         return request.user.is_superuser or (request.user.is_authenticated and request.user.role in ['admin', 'editor'])
-
     def has_delete_permission(self, request, obj=None):
         return request.user.is_superuser or (request.user.is_authenticated and request.user.role == 'admin')
-
     def has_view_permission(self, request, obj=None):
         return request.user.is_authenticated
-    
+
+
 # ==========================================
 # 3. ADMIN MEDICAL FACILITY (DINKES)
 # ==========================================
 @admin.register(MedicalFacility)
 class MedicalFacilityAdmin(OPDPermissionMixin, SoftDeleteAdminMixin, UUIDTimestampMixin, admin.ModelAdmin):
-    list_display = ['uuid', 'nama', 'tipe', 'status', 'created_by_uuid', 'created_at', 'updated_at', 'is_deleted']
+    list_display = ['uuid', 'nama', 'tipe', 'status', 'created_by_name', 'created_at', 'updated_at', 'is_deleted']
     list_filter = [ActiveStatusFilter, 'status', 'tipe']
     search_fields = ['nama', 'koderumahsakit']
     readonly_fields = ['uuid', 'created_by', 'created_by_detail', 'created_at', 'updated_at', 'is_deleted', 'deleted_at', 'date_field']
 
-    # ✅ 2. ASSIGN FORM CUSTOM KE ADMIN
     form = MedicalFacilityForm
 
     def formfield_for_dbfield(self, db_field, request, **kwargs):
-        if db_field.name == 'location':
-            kwargs['widget'] = SearchableLeafletWidget
+        if db_field.name == 'location': kwargs['widget'] = SearchableLeafletWidget
         return super().formfield_for_dbfield(db_field, request, **kwargs)
 
 
@@ -323,8 +291,7 @@ class MedicalFacilityAdmin(OPDPermissionMixin, SoftDeleteAdminMixin, UUIDTimesta
 # ==========================================
 @admin.register(DistrictOfficeFacility)
 class DistrictOfficeFacilityAdmin(OPDPermissionMixin, SoftDeleteAdminMixin, UUIDTimestampMixin, admin.ModelAdmin):
-    list_display = ['uuid', 'nama', 'tipe', 'status', 'created_by_uuid', 'created_at', 'updated_at', 'is_deleted']
-    # ✅ Ganti 'is_deleted' dengan ActiveStatusFilter
+    list_display = ['uuid', 'nama', 'tipe', 'status', 'created_by_name', 'created_at', 'updated_at', 'is_deleted']
     list_filter = [ActiveStatusFilter, 'status', 'tipe']
     search_fields = ['nama']
     readonly_fields = ['uuid', 'created_by', 'created_by_detail', 'created_at', 'updated_at', 'is_deleted', 'deleted_at', 'date_field']
@@ -339,8 +306,7 @@ class DistrictOfficeFacilityAdmin(OPDPermissionMixin, SoftDeleteAdminMixin, UUID
 # ==========================================
 @admin.register(CCTVFacility)
 class CCTVFacilityAdmin(OPDPermissionMixin, SoftDeleteAdminMixin, UUIDTimestampMixin, admin.ModelAdmin):
-    list_display = ['uuid', 'kode_cam', 'nama_lokasi', 'wilayah', 'is_active', 'created_by_uuid', 'created_at', 'updated_at', 'is_deleted']
-    # ✅ Ganti 'is_deleted' dengan ActiveStatusFilter
+    list_display = ['uuid', 'kode_cam', 'nama_lokasi', 'wilayah', 'is_active', 'created_by_name', 'created_at', 'updated_at', 'is_deleted']
     list_filter = [ActiveStatusFilter, 'is_active', 'wilayah']
     search_fields = ['kode_cam', 'nama_lokasi']
     readonly_fields = ['uuid', 'created_by', 'created_by_detail', 'created_at', 'updated_at', 'is_deleted', 'deleted_at', 'date_field']
@@ -355,9 +321,7 @@ class CCTVFacilityAdmin(OPDPermissionMixin, SoftDeleteAdminMixin, UUIDTimestampM
 # ==========================================
 @admin.register(BatasKecamatan)
 class BatasKecamatanAdmin(SoftDeleteAdminMixin, UUIDTimestampMixin, admin.ModelAdmin):
-    list_display = ['uuid', 'kecamatan', 'kd_kcmtan', 'tipe', 'created_by_uuid', 'created_at', 'updated_at', 'is_deleted']
-    # ✅ Hapus list_filter manual agar mewarisi ActiveStatusFilter dari Mixin
-    # list_filter = ['is_deleted'] <-- HAPUS BARIS INI
+    list_display = ['uuid', 'kecamatan', 'kd_kcmtan', 'tipe', 'created_by_name', 'created_at', 'updated_at', 'is_deleted']
     search_fields = ['kecamatan', 'kd_kcmtan']
     readonly_fields = ['uuid', 'created_by', 'created_by_detail', 'created_at', 'updated_at', 'is_deleted', 'deleted_at']
     fields = ['geojson_file']
@@ -365,8 +329,7 @@ class BatasKecamatanAdmin(SoftDeleteAdminMixin, UUIDTimestampMixin, admin.ModelA
     def has_module_permission(self, request):
         if request.user.is_superuser: return True
         user = request.user
-        if not user.is_authenticated or not hasattr(user, 'opd') or not user.opd:
-            return False
+        if not user.is_authenticated or not hasattr(user, 'opd') or not user.opd: return False
         return user.opd.kode == 'DTRB' or user.role in ['admin', 'editor']
 
     def get_queryset(self, request):
@@ -381,7 +344,6 @@ class BatasKecamatanAdmin(SoftDeleteAdminMixin, UUIDTimestampMixin, admin.ModelA
         return request.user.is_authenticated and request.user.opd and request.user.opd.kode == 'DTRB' and request.user.role in ['admin', 'editor']
 
     def has_change_permission(self, request, obj=None): return self.has_add_permission(request)
-    
     def has_delete_permission(self, request, obj=None):
         if request.user.is_superuser: return True
         return request.user.is_authenticated and request.user.opd and request.user.opd.kode == 'DTRB' and request.user.role == 'admin'
